@@ -4,9 +4,13 @@ modified_blackbody_emcee
 This is a package to fit modified blackbodies to photometry
 data using an affine invariant MCMC.
 
+###Installation
+The usual
+	python setup.py install
+
 ###Usage
 The command line routine is
-	modified_blackbody_emcee.py
+	run_blackbody_emcee.py
 
 Help can be obtained via
 	modified_blackbody_emcee.py --help
