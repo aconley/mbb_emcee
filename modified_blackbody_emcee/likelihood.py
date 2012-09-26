@@ -1,11 +1,11 @@
 import numpy
 import math
-import modified_blackbody
+from modified_blackbody import modified_blackbody
 
-__all__ = ["modified_blackbody_like"]
+__all__ = ["likelihood"]
 
 """Class holding data, defining likelihood"""
-class modified_blackbody_like(object) :
+class likelihood(object) :
     def __init__(self, photfile, covfile=None, covextn=0, 
                  wavenorm=500.0, redshift=None, noalpha=False,
                  opthin=False) :
@@ -140,11 +140,9 @@ class modified_blackbody_like(object) :
         if len(pars) != 5:
             raise ValueError("pars is not of expected length 5")
 
-        bkb = modified_blackbody.modified_blackbody(pars[0], pars[1],
-                                                    pars[2], pars[3], pars[4],
-                                                    wavenorm=self._wavenorm,
-                                                    noalpha=self._noalpha,
-                                                    opthin=self._opthin)
+        bkb = modified_blackbody(pars[0], pars[1], pars[2], pars[3], pars[4],
+                                 wavenorm=self._wavenorm, noalpha=self._noalpha,
+                                 opthin=self._opthin)
         return bkb(wave)
 
     def __call__(self, pars) :

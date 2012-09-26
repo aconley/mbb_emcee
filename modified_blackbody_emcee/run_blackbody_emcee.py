@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!python
 
 """MCMC model for modified blackbody fit to far-IR/sub-mm/mm photometry.
 This works in the observer frame."""
@@ -8,7 +8,7 @@ This works in the observer frame."""
 import numpy
 import emcee
 import math
-from modified_blackbody_like import modified_blackbody_like
+from modified_blackbody_emcee import likelihood
 
 if __name__ == "__main__" :
     #Do the fit!
@@ -156,12 +156,9 @@ if __name__ == "__main__" :
     else: covfile = None
 
     #This object handles all the calculations
-    sed = modified_blackbody_like(photfile,covfile=covfile,
-                                  covextn=results.covextn, 
-                                  wavenorm=results.wavenorm,
-                                  redshift=results.redshift,
-                                  noalpha=results.noalpha,
-                                  opthin=results.opthin)
+    sed = likelihood(photfile,covfile=covfile, covextn=results.covextn, 
+                     wavenorm=results.wavenorm, redshift=results.redshift,
+                     noalpha=results.noalpha, opthin=results.opthin)
 
     
     #Set parameters fixed/limits if present
