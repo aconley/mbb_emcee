@@ -3,7 +3,7 @@ __all__ = ["isiterable"]
 
 def isiterable(obj):
     """Returns `True` if the given object is iterable."""
-    import collections
+    import collections, numpy
 
     # Numpy arrays are in collections.Iterable no matter what, but if you
     # attempt to iterate over a 0-d array, it throws a TypeError.

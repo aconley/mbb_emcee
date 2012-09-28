@@ -1,15 +1,11 @@
 import math
 import numpy
 import scipy.optimize
+from scipy.special import lambertw
 
 from utility import isiterable
 
 """Modified blackbody SED"""
-
-def alpha_merge_eqn_opthin(x, alpha, beta):
-    """Equation we need the root for to merge power law to modified
-    blackbody, optically thin version"""
-    return x - (1.0 - math.exp(-x)) * (3.0 + alpha + beta)
 
 def alpha_merge_eqn(x, alpha, beta, x0, opthin=False):
     """Equation we need the root for to merge power law to modified
@@ -44,29 +40,29 @@ class modified_blackbody(object):
 
         Parameters:
         -----------
-        T : (float)
+        T : float
           Temperature/(1+z) in K
         
-        beta : (float)
+        beta : float
           Extinction slope
 
-        lambda0 : (float)
+        lambda0 : float
           Wavelength where emission becomes optically thick * (1+z), in 
           microns
 
-        alpha : (float)
+        alpha : float
           Blue side power law slope
 
-        fnorm : (float)
+        fnorm : float
           Normalization flux, in mJy
 
-        wavenorm : (float)
+        wavenorm : float
           Wavelength of normalization flux, in microns (def: 500)
 
-        noalpha : (bool)
+        noalpha : bool
           Do not use blue side power law
 
-        opthin : (bool)
+        opthin : bool
           Assume emission is optically thin
         """
 
@@ -82,7 +78,13 @@ class modified_blackbody(object):
         else:
             self._opthin = False
             
-        #Set up stuff like normalization, merge
+        if self._hasalpha and alpha <= 0.0:
+            errmsg = "alpha must be positive.  You gave: %.5g" % self._alpha
+            raise ValueError(errmsg)
+        if self._beta <= 0.0:
+            errmsg = "beta must be positive.  You gave: %.5g" % self._beta
+            raise ValueError(errmsg)
+
         # Some constants
         c = 299792458e6 #in microns
         h = 6.6260693e-34 #J/s
@@ -91,7 +93,7 @@ class modified_blackbody(object):
 
         # Convert wavelengths to x = h nu / k T
         self._x0 = hcokt / lambda0
-        self._xnorm = hcokt / wavenorm
+        self._xnorm = hcokt / self._wavenorm
 
         # Two cases -- optically thin and not.
         #  Each has two sub-cases -- with power law merge and without
@@ -102,24 +104,17 @@ class modified_blackbody(object):
                     self._xnorm**(3.0 + beta)
             else:
                 # First, figure out the x (frequency) where the join
-                # happens.  Ass frequencies above this (x > xmarge)
+                # happens.  At frequencies above this (x > xmarge)
                 # are on the blue, alpha power law side
-                # This has to be done numerically
-                a = 0.01
-                b = 30.0
-                aval = alpha_merge_eqn_opthin(a, self._alpha, self._beta)
-                bval = alpha_merge_eqn_opthin(b, self._alpha, self._beta)
-
-                if (aval * bval > 0) :  #Should have opposite signs!
-                    errmsg="Couldn't find alpha merge point for T: "\
-                        "%f beta: %f alpha %f, f(%f): %f f(%f): %f"
-                    errmsg %= (self._T,self._beta,self._alpha,a,aval,b,bval)
-                    raise ValueError(errmsg)
-
-                args = (self._alpha, self._beta)
-                self._xmerge = scipy.optimize.brentq(alpha_merge_eqn_opthin, 
-                                                     a, b, args=args,
-                                                     disp=True)
+                # The equation we are trying to find the root for is:
+                #  x - (1-exp(-x))*(3+alpha+beta)
+                # Amazingly, this has a special function solution
+                #   A = (3+alpha+beta)
+                #   xmerge = A + LambertW[ -A Exp[-A] ]
+                # This has a positive solution for all A > 1 -- and since
+                # we require alpha and beta > 0, this is always the case
+                a = 3.0 + self._alpha + self._beta
+                self._xmerge = a + lambertw(-a * math.exp(-a)).real
 
                 # Get merge constant -- note this is -before- flux normalization
                 # to allow for the case where wavenorm is on the power law part
@@ -138,24 +133,55 @@ class modified_blackbody(object):
             #Optically thick case
             if not self._hasalpha:
                 self._normfac = - self._fnorm * math.expm1(self._xnorm) / \
-                    (math.expm1(-(self._xnorm / self._x0)**beta) * \
+                    (math.expm1(-(self._xnorm / self._x0)**self._beta) * \
                          self._xnorm**3)
             else :
-                a = 0.01
-                b = 30.0
+                # This is harder, and does not have a special function
+                # solution.  Hence, we have to do this numerically.
+                # The equation we need to find the root for is given by 
+                # alpha_merge_eqn.  
+
+                # First, we bracket.  For positive alpha, beta
+                # we expect this to be negative for small a and positive
+                # for large a.  We try to step out until we achieve that
+                maxiters = 100
+                a = 0.1
                 aval = alpha_merge_eqn(a, self._alpha, self._beta, self._x0)
+                iter = 0
+                while aval >= 0.0:
+                    a /= 2.0
+                    aval = alpha_merge_eqn(a, self._alpha, self._beta, self._x0)
+                    if iter > maxiters:
+                        errmsg = "Couldn't bracket low alpha merge point for "\
+                            "T: %f beta: %f lambda0: %f alpha %f, "\
+                            "last a: %f value: %f"
+                        errmsg %= (self._T, self._beta, self._lambda0, 
+                                   self._alpha, a, aval)
+                        raise ValueError(errmsg)
+                    iter += 1
+
+                b = 15.0
                 bval = alpha_merge_eqn(b, self._alpha, self._beta, self._x0)
-                if (aval * bval > 0) :  #Should have opposite signs!
-                    errmsg="Couldn't find alpha merge point for T: "\
-                        "%f beta: %f lambda0: %f alpha %f, f(%f): %f f(%f): %f"
-                    errmsg %= (self._T, self._beta, self._lambda0, 
-                               self._alpha, a, aval, b, bval)
-                    raise ValueError(errmsg)
-                
+                iter = 0
+                while bval <= 0.0:
+                    b *= 2.0
+                    bval = alpha_merge_eqn(b, self._alpha, self._beta, self._x0)
+                    if iter > maxiters:
+                        errmsg = "Couldn't bracket high alpha merge point for "\
+                            "T: %f beta: %f lambda0: %f alpha %f, "\
+                            "last b: %f value: %f"
+                        errmsg %= (self._T, self._beta, self._lambda0, 
+                                   self._alpha, b, bval)
+                        raise ValueError(errmsg)
+                    iter += 1
+                    
+                # Now find root
                 args = (self._alpha, self._beta, self._x0)
                 self._xmerge = scipy.optimize.brentq(alpha_merge_eqn, a, b,
                                                      args=args, disp=True)
 
+                #Merge constant
+                # Note this will overflow and crash for large xmerge, alpha
                 self._kappa = - self._xmerge**(3 + self._alpha) * \
                     math.expm1(-(self._xmerge / self._x0)**self._beta) / \
                     math.expm1(self._xmerge)
@@ -201,6 +227,12 @@ class modified_blackbody(object):
     def optically_thin(self):
         return self._opthin
 
+    def __repr__(self):
+        retstr = "T: %.4g beta: %.4g lambda0: %.4g alpha: %.4g fnorm: %.4g"
+        retstr += " noalpha: %s opthin: %s"
+        return retstr % (self._T, self._beta, self._lambda0, self._alpha,
+                         self._fnorm, not self._hasalpha, self._opthin)
+
     def __call__(self, wave):
         """Evaluate modified blackbody at specified wavelengths
 
@@ -217,7 +249,9 @@ class modified_blackbody(object):
 
         wviter = isiterable(wave)
         if wviter:
-            wave = numpy.asarray(wave)
+            wave = numpy.asanyarray(wave, dtype=numpy.float)
+        else:
+            wave = float(wave)
 
         # Some constants
         c = 299792458e6 #in microns
@@ -226,8 +260,11 @@ class modified_blackbody(object):
         hcokt = h * c / (k * self._T)
 
         # Convert wavelengths to x = h nu / k T
-        x = hcokt / numpy.array(wave)
+        x = hcokt / wave
         
+        if x.min() <= 0.0:
+            raise ValueError("Invalid (non-positive) wavelengths")
+
         # Two cases -- optically thin and not.
         #  Each has two sub-cases -- with power law merge and without
         if self._opthin:
