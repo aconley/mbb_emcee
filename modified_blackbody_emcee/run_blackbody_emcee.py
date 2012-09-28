@@ -56,8 +56,8 @@ parser.add_argument('photfile',action='store',
                     help="Text file holding photometry in microns, mJy, error")
 parser.add_argument('outfile',action='store',
                     help="File to pickle resulting chain to")
-parser.add_argument('-b','--burn',action='store',type=int,default=500,
-                    help="Number of burn-in steps to do (def: 500)")
+parser.add_argument('-b','--burn',action='store',type=int,default=50,
+                    help="Number of burn-in steps to do (def: 50)")
 parser.add_argument('-c','--covfile',action='store',
                     help="FITS file containing covariances (in mJy)",
                     default=None)
@@ -84,6 +84,8 @@ parser.add_argument('--initLambda0', action='store', type=float,
                     help="Initial Lambda0*(1+z)")
 parser.add_argument('--initFnorm', action='store', type=float, default=40.0,
                     help="Initial Fnorm")
+parser.add_argument('--getlir',action='store_true',default=False,
+                    help="Get the rest frame Lir (8-1000 um).  You must set the redshift")
 parser.add_argument("--lowT",action='store',type=float,default=None,
                     help="Lower limit on T (Def:0)")
 parser.add_argument("--lowBeta",action='store',type=float,default=None,
@@ -101,8 +103,8 @@ parser.add_argument('-n','--nwalkers',action='store',type=int,
                     help="Number of walkers to use in MCMC (Def: 250)",
                     default=250)
 parser.add_argument('-N','--nsteps',action='store',type=int,
-                    default=1000,
-                    help="Number of steps to take per walker (Def: 1000)")
+                    default=250,
+                    help="Number of steps to take per walker (Def: 250)")
 parser.add_argument('--noalpha',action='store_true',default=False,
                     help="Do not use blue side power law in fit")
 parser.add_argument('--opthin',action="store_true",default=False,
@@ -136,6 +138,10 @@ parser.add_argument('-V','--version',action='version',
 parser.add_argument('-w','--wavenorm',action='store', 
                     type=float, default=500.0,
                     help="Observer frame wavelength of normalization (def: 500)")
+parser.add_argument('-z','--redshift',action='store',
+                    type=float, default=None,
+                    help="Redshift of object")
+
 
 results = parser.parse_args() #Runs on sys.argv by default
 
@@ -153,7 +159,8 @@ else: covfile = None
 # This object handles all the calculations
 lkl = likelihood(photfile,covfile=covfile, covextn=results.covextn, 
                  wavenorm=results.wavenorm, noalpha=results.noalpha, 
-                 opthin=results.opthin)
+                 opthin=results.opthin, compute_lir=results.getlir,
+                 redshift=results.redshift)
     
 
 # Set parameters fixed/limits if present
@@ -243,7 +250,8 @@ if results.burn <= 0 :
     raise ValueError("Invalid (non-positive) number of burn in steps: %d" %
                      results.burn)
 if results.verbose : print "Doing burn in with %d steps" % results.burn
-pos, prob, state = sampler.run_mcmc(p0, results.burn)
+# burnstate is pos, prob, state, blob tuple
+pos, prob, rstate = sampler.run_mcmc(p0, results.burn)
     
 # Reset the chain to remove the burn-in samples.
 sampler.reset()
@@ -252,7 +260,7 @@ if results.nsteps <= 0 :
     raise ValueError("Invalid (non-positive) number of steps: %d" % 
                      results.nsteps)
 if results.verbose : print "Main chain with %d steps" % results.nsteps
-st = sampler.run_mcmc(pos, results.nsteps, rstate0=state)
+st = sampler.run_mcmc(pos, results.nsteps, rstate0=rstate)
 
 if results.verbose :
     print "Mean acceptance fraction:", \
@@ -264,10 +272,10 @@ if results.verbose :
             results.nsteps
         print "\tT:        %f" % acor[0]
         print "\tbeta:     %f" % acor[1]
-        if not results.noalpha:
-            print "\talpha:    %f" % acor[2]
         if not results.opthin:
-            print "\tlambda0:  %f" % acor[3]
+            print "\tlambda0:  %f" % acor[2]
+        if not results.noalpha:
+            print "\talpha:    %f" % acor[3]
         print "\tfnorm:    %f" % acor[4]
     except ImportError :
         print "Unable to estimate autocorrelation time (acor not installed)"
@@ -276,6 +284,8 @@ if results.verbose :
 #Save results
 if results.verbose : print "Saving results"
 output = open(results.outfile,'wb')
-chn = sampler.flatchain
-pickle.dump(chn,output)
+#chn = sampler.flatchain
+#pickle.dump(chn, output)
+pickle.dump(sampler, output)
+pickle.dump(lkl, output)
 output.close()

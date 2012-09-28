@@ -1,14 +1,15 @@
 import numpy as np
 import math
 from modified_blackbody import modified_blackbody
+import astropy.cosmology
 
 __all__ = ["likelihood"]
 
 """Class holding data, defining likelihood"""
 class likelihood(object) :
     def __init__(self, photfile, covfile=None, covextn=0, 
-                 wavenorm=500.0, redshift=None, noalpha=False,
-                 opthin=False) :
+                 wavenorm=500.0, noalpha=False, opthin=False, 
+                 compute_lir=False, redshift=None) :
         """Photfile is the name of the photometry file, covfile the name
         of a fits file holding the covariance matrix (if present), which
         is in extension covextn.  The wavelength normalizing the SED is
@@ -20,6 +21,7 @@ class likelihood(object) :
         self._wavenorm = float(wavenorm)
         self._noalpha = bool(noalpha)
         self._opthin = bool(opthin)
+        self._compute_lir = bool(compute_lir)
 
         # Set up information about fixed params, param limits, and
         # priors.
@@ -32,11 +34,11 @@ class likelihood(object) :
         # so as long as we stay above that
         self._lowlim = np.array([1, 1e-3, 1, 1e-3, 1e-3])
 
-        # Setup upper limits; note that alpha has a real
-        # upper limit by default
-        self._has_uplim = [False, False, False, True, True]
+        # Setup upper limits; note that alpha and beta have
+        # upper limits by default
+        self._has_uplim = [False, True, False, True, False]
         inf = float("inf")
-        self._uplim = np.array([inf, inf, inf, 20.0, 20.0])
+        self._uplim = np.array([inf, 20.0, inf, 20.0, inf])
 
         # Setup Gaussian prior
         self._any_gprior = False
@@ -51,12 +53,25 @@ class likelihood(object) :
         else:
             self._has_covmatrix = False
 
-        # Reset normalization flux limit based on data
+        # Reset normalization flux lower limit based on data
         self._lowlim[4] = 1e-3 * self._flux.min()
+
+        if self._compute_lir:
+            if self._z is None:
+                raise ValueError("Must provide redshift if computing L_IR")
+            # Get luminosity distance in cm
+            dl = astropy.cosmology.WMAP7.luminosity_distance(self._z)
+            # 4*pi*dl^2/L_sun in cgs -- so the output will be in 
+            # solar luminosities; the prefactor is
+            # 4 * pi * mpc_to_cm^2/L_sun
+            self._lirprefac = 3.11749657e16 * dl**2
+            opz = 1.0 + self._z
+            self._minfreq_lir = 299792458e-3/1000.0/opz #1000um rest
+            self._maxfreq_lir = 299792458e-3/8.0/opz #8um rest
 
         self._badval = float("-inf")
 
-    def read_phot( self, filename ) :
+    def read_phot(self, filename) :
         """Reads in the photometry file, storing the wave [um],
         flux [mJy] and uncertainties [mJy]"""
         import asciitable
@@ -77,7 +92,7 @@ class likelihood(object) :
             self._has_uplim[2] = True
             self._uplim[2] = 5.0 * self._wave.max()
 
-    def read_cov( self, filename, extn=0 ) :
+    def read_cov(self, filename, extn=0) :
         """Reads in the covariance matrix from the specified
         extension of the input FITS file (in extension extn)"""
         import pyfits
@@ -178,20 +193,29 @@ class likelihood(object) :
 
         return logpenalty
 
-    def getsed(self, pars, wave) :
-        """Returns the model SED at the specified wavelength -- which
-        can be an array (numpy or otherwise)
+    def _set_sed(self, pars):
+        """Set up the SED for the provided parameters
 
         The order of pars is T, beta, lambda0, alpha, fnorm
         """
 
         if len(pars) != 5:
             raise ValueError("pars is not of expected length 5")
+        self._sed = modified_blackbody(pars[0], pars[1], pars[2], pars[3], 
+                                       pars[4], wavenorm=self._wavenorm, 
+                                       noalpha=self._noalpha,
+                                       opthin=self._opthin)
+        
 
-        bkb = modified_blackbody(pars[0], pars[1], pars[2], pars[3], pars[4],
-                                 wavenorm=self._wavenorm, noalpha=self._noalpha,
-                                 opthin=self._opthin)
-        return bkb(wave)
+    def get_sed(self, pars, wave) :
+        """Returns the model SED at the specified wavelength -- which
+        can be an array (numpy or otherwise)
+
+        The order of pars is T, beta, lambda0, alpha, fnorm
+        """
+
+        self._set_sed(pars)
+        return self._sed(wave)
 
     def __call__(self, pars) :
         """Gets log likelihood assuming Gaussian errors: log P( pars | data )
@@ -203,35 +227,47 @@ class likelihood(object) :
         # Return large negative number if bad
         if not self._check_lowlim(pars): return self._badval
 
-        diff = self._flux - self.getsed(pars,self._wave)
+        # Set params in model
+        self._set_sed(pars)
+
+        # Assume Gaussian uncertanties, ignore constant prefactor
+        diff = self._flux - self._sed(self._wave)
         if self._has_covmatrix:
             lnlike = -0.5*np.dot(diff,np.dot(self._invcovmatrix,diff))
         else:
             lnlike = -0.5*np.sum(diff**2*self._ivar)
 
+        # Add in upper limit priors
         lnlike += self._uplim_prior(pars)
 
-        #Add Gaussian priors
+        # Add Gaussian priors
         if self._any_gprior:
             for idx, val in enumerate(pars):
                 if self._has_gprior[idx]:
                     delta = val - self._gprior_mean[idx]
                     lnlike -= 0.5 * self._gprior_ivar[idx] * delta**2
-        
+
         return lnlike
 
-    def freqint(self, chain, minfreq, maxfreq, step=0.1) :
+        # Possibly compute L_ir for metadata blob
+        #if self._compute_lir:
+        #    lir = self._lirprefac * \
+        #        self._freqint(self._minfreq_lir, self._maxfreq_lir,
+        #                      step=0.25)
+        #    return lnlike, lir
+        #else:
+        #    return lnlike
+
+    def _freqint(self, minfreq, maxfreq, step=0.1) :
         """Integrates greybody between minfreq/maxfreq (in GHz)
-        in erg/s/cm^2 (assuming fnorm is mJy), taking an array of parameters
-        in the order T, beta, alpha, lambda0, fnorm"""
-        nchain = chain.shape[0]
-        integral = np.zeros(nchain)
+
+        The integral is returned in erg/s/cm^2.
+        minfreq and maxfreq are in GHz, as is step.
+
+        The parameters must already be set in the SED model
+        """
         freq = np.arange(minfreq,maxfreq,step)
         waveln = 299792458e-3/freq
         ifac = step*1e-17 
-        for i in xrange(nchain) :
-            pars = chain[i,:]
-            model = self.getsed(pars, waveln)
-            integral[i] = np.sum(model) * ifac
-        return integral
+        return np.sum(self._sed(waveln)) * ifac
     
