@@ -3,6 +3,12 @@
 # C extensions
 *.so
 
+#temp files
+modified_blackbody_emcee/#*
+modified_blackbody_emcee/.#*
+*~
+modified_blackbody_emcee/*~
+
 # Packages
 *.egg
 *.egg-info

@@ -4,9 +4,33 @@ import math
 from modified_blackbody import modified_blackbody
 from likelihood import likelihood
 
-__all__ = ["modified_blackbody_fit"]
+__all__ = ["modified_blackbody_fit", "modified_blackbody_results"]
 
-#Set up class to hold results
+# This class holds the results.  Why don't we just save the
+# fit class?  Because it can involve a multiprocessing pool,
+# which can't be pickled
+class modified_blackbody_results(object):
+    """Holds results of fit"""
+    def __init__(self, fit):
+        """Takes a modified_blackbody_fit object"""
+        self.like = fit.like
+        self.chain = fit.sampler.chain
+        self.lnprobability = fit.sampler.lnprobability
+        try:
+            self.lir = fit.lir
+        except AttributeError:
+            pass
+        try:
+            self.lagn = fit.lagn
+        except AttributeError:
+            pass
+        try:
+            self.dustmass = fit.dustmass
+        except AttributeError:
+            pass
+
+
+# Set up class to do fit
 class modified_blackbody_fit(object):
     """Does fit"""
     def __init__(self, photfile, covfile, covextn, wavenorm, noalpha, 
@@ -63,7 +87,7 @@ class modified_blackbody_fit(object):
             except ImportError :
                 pass
 
-    def get_lir(self, redshift):
+    def get_lir(self, redshift, maxidx=None):
         """Get 8-1000 micron LIR from chain"""
         try:
             import astropy.cosmology
@@ -88,7 +112,10 @@ class modified_blackbody_fit(object):
         # Now we compute L_IR for every step taken, checking
         # for repeats
         shp = self.sampler.chain.shape[0:2]
-        self.lir = numpy.empty(shp, dtype=numpy.float)
+        steps = shp[1]
+        if not maxidx is None:
+            if maxidx < steps: steps = maxidx
+        self.lir = numpy.empty((shp[0],steps), dtype=numpy.float)
         for walkidx in range(shp[0]):
             # Do first step
             prevstep = self.sampler.chain[walkidx,0,:]
@@ -98,8 +125,8 @@ class modified_blackbody_fit(object):
                                      noalpha=self._noalpha)
             self.lir[walkidx,0] = \
                 lirprefac * sed.freq_integrate(minwave, maxwave)
-            for stepidx in range(1, shp[1]):
-                currstep = self.sampler.chain[walkidx,0,:]
+            for stepidx in range(1, steps):
+                currstep = self.sampler.chain[walkidx,stepidx,:]
                 if numpy.allclose(prevstep, currstep):
                     # Repeat, so avoid re-computation
                     self.lir[walkidx, stepidx] = self.lir[walkidx, stepidx-1]
@@ -113,7 +140,7 @@ class modified_blackbody_fit(object):
                         lirprefac * sed.freq_integrate(minwave, maxwave)
                     prevstep = currstep
 
-    def get_lagn(self, redshift):
+    def get_lagn(self, redshift, maxidx=None):
         """Get 42.5-112.5 micron luminosity from chain"""
         try:
             import astropy.cosmology
@@ -140,7 +167,10 @@ class modified_blackbody_fit(object):
         # Now we compute L_IR for every step taken, checking
         # for repeats
         shp = self.sampler.chain.shape[0:2]
-        self.lagn = numpy.empty(shp, dtype=numpy.float)
+        steps = shp[1]
+        if not maxidx is None:
+            if maxidx < steps: steps = maxidx
+        self.lagn = numpy.empty((shp[0],steps), dtype=numpy.float)
         for walkidx in range(shp[0]):
             # Do first step
             prevstep = self.sampler.chain[walkidx,0,:]
@@ -150,8 +180,8 @@ class modified_blackbody_fit(object):
                                      noalpha=self._noalpha)
             self.lagn[walkidx,0] = \
                 lagnprefac * sed.freq_integrate(minwave, maxwave)
-            for stepidx in range(1, shp[1]):
-                currstep = self.sampler.chain[walkidx,0,:]
+            for stepidx in range(1, steps):
+                currstep = self.sampler.chain[walkidx,stepidx,:]
                 if numpy.allclose(prevstep, currstep):
                     # Repeat, so avoid re-computation
                     self.lagn[walkidx, stepidx] = self.lagn[walkidx, stepidx-1]
@@ -184,7 +214,7 @@ class modified_blackbody_fit(object):
             dustmass *= op_fac
         return dustmass
 
-    def get_dustmass(self, redshift):
+    def get_dustmass(self, redshift, maxidx=None):
         """Get dust mass in 10^8 M_sun from chain"""
         try:
             import astropy.cosmology
@@ -216,14 +246,17 @@ class modified_blackbody_fit(object):
         msolar8 = 1.97792e41 ## mass of the sun*10^8 in g
 
         shp = self.sampler.chain.shape[0:2]
-        self.dustmass = numpy.empty(shp, dtype=numpy.float)
+        steps = shp[1]
+        if not maxidx is None:
+            if maxidx < steps: steps = maxidx
+        self.dustmass = numpy.empty((shp[0],steps), dtype=numpy.float)
         for walkidx in range(shp[0]):
             # Do first step
             prevstep = self.sampler.chain[walkidx,0,:]
             self.dustmass[walkidx,0] = self._dmass_calc(prevstep, opz, bnu_fac,
                                                         temp_fac, knu_fac, 
                                                         self._opthin, dl2)
-            for stepidx in range(1, shp[1]):
+            for stepidx in range(1, steps):
                 currstep = self.sampler.chain[walkidx,0,:]
                 if numpy.allclose(prevstep, currstep):
                     # Repeat, so avoid re-computation

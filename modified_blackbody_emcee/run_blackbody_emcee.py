@@ -7,6 +7,7 @@ This works in the observer frame."""
 
 import numpy
 from modified_blackbody_emcee import modified_blackbody_fit
+from modified_blackbody_emcee import modified_blackbody_results
 
 if __name__ == "__main__":
     import argparse
@@ -102,6 +103,8 @@ if __name__ == "__main__":
     parser.add_argument('-p','--photdir',action='store',
                         help="Directory to look for files in",
                         default=None)
+    parser.add_argument('--maxidx',action='store',type=int,default=None,
+                        help="Maximum number of steps (per walker) to include in L_IR, L_AGN, and dustmass")
     parser.add_argument('-n','--nwalkers',action='store',type=int,
                         help="Number of walkers to use in MCMC (Def: 250)",
                         default=250)
@@ -257,7 +260,7 @@ if __name__ == "__main__":
         if parse_results.redshift is None:
             raise ValueError("Must provide redshift if computing L_IR")
         if parse_results.verbose: print "Computing L_IR (8-1000)"
-        fit.get_lir(parse_results.redshift)
+        fit.get_lir(parse_results.redshift, maxidx=parse_results.maxidx)
 
 
     # L_AGN computation
@@ -265,17 +268,18 @@ if __name__ == "__main__":
         if parse_results.redshift is None:
             raise ValueError("Must provide redshift if computing L_AGN")
         if parse_results.verbose: print "Computing L_AGN (42.5-122.5)"
-        fit.get_lagn(parse_results.redshift)
+        fit.get_lagn(parse_results.redshift, maxidx=parse_results.maxidx)
 
     # M_dust computation
     if parse_results.get_dustmass: 
         if parse_results.redshift is None:
             raise ValueError("Must provide redshift if computing m_dust")
         if parse_results.verbose: print "Computing dust mass"
-        fit.get_dustmass(parse_results.redshift)
+        fit.get_dustmass(parse_results.redshift, maxidx=parse_results.maxidx)
 
 
-#Jam parse_results into a dictionary, and save that
+    # Jam parse_results into a output struct, and save that
     if parse_results.verbose : print "Saving results"
     with open(parse_results.outfile,'wb') as fl:
-        pickle.dump(fit, fl)
+        res = modified_blackbody_results(fit)
+        pickle.dump(res, fl)
