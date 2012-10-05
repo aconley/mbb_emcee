@@ -7,6 +7,8 @@ from utility import isiterable
 
 """Modified blackbody SED"""
 
+__all__ = ["modified_blackbody"]
+
 def alpha_merge_eqn(x, alpha, beta, x0, opthin=False):
     """Equation we need the root for to merge power law to modified
     blackbody"""
