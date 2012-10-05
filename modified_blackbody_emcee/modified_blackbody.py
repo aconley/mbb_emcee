@@ -233,6 +233,61 @@ class modified_blackbody(object):
         return retstr % (self._T, self._beta, self._lambda0, self._alpha,
                          self._fnorm, not self._hasalpha, self._opthin)
 
+    def f_nu(self, freq):
+        """Evaluate modifed blackbody at specified frequencies.
+
+        Parameters
+        ----------
+        freq : array_like
+          Input frequencies, in GHz
+
+        Returns
+        -------
+        fnu : ndarray, or float if input scalar
+          The flux density in mJy
+        """
+
+        # Convert to some form of numarray
+        if not isiterable(freq):
+            frequency = numpy.asarray([freq], dtype=numpy.float)
+        else:
+            frequency = numpy.asanyarray(freq, dtype=numpy.float)
+
+        # Some constants
+        h = 6.6260693e-34 #J/s
+        k = 1.3806505e-23 #J/K
+        hokt = h / (k * self._T)
+
+        # Convert wavelengths to x = h nu / k T
+        x = hokt * 1e9 * frequency  #1e9 to convert to Hz from GHz
+
+        # Two cases -- optically thin and not.
+        #  Each has two sub-cases -- with power law merge and without
+        if self._opthin:
+            if not self._hasalpha:
+                retval = self._normfac * x**(3.0 + self._beta) / numpy.expm1(x)
+            else:
+                retval = numpy.zeros_like(frequency)
+                ispower = x > self._xmerge
+                retval[ispower] = self._kappa * x[ispower]**(-self._alpha)
+                retval[~ispower] = x[~ispower]**(3.0 + self._beta) / \
+                    numpy.expm1(x[~ispower])
+                retval *= self._normfac
+        else:
+            if not self._hasalpha:
+                retval = - self._normfac * \
+                    numpy.expm1(-(x / self._x0)**self._beta) * x**3 / \
+                    numpy.expm1(x)
+            else :
+                retval = numpy.zeros_like(frequency)
+                ispower = x > self._xmerge
+                retval[ispower] = self._kappa * x[ispower]**(-self._alpha)
+                retval[~ispower] = \
+                    - numpy.expm1( - (x[~ispower]/self._x0)**self._beta) * \
+                    x[~ispower]**3/numpy.expm1(x[~ispower])
+                retval *= self._normfac
+        return retval
+
     def __call__(self, wave):
         """Evaluate modified blackbody at specified wavelengths
 
@@ -246,64 +301,50 @@ class modified_blackbody(object):
         fnu : ndarray, or float if input scalar
           The flux density in mJy
         """
-
+        
+        c = 299792458e-3 #The microns to GHz conversion
         wviter = isiterable(wave)
         if wviter:
             wave = numpy.asanyarray(wave, dtype=numpy.float)
+            return self.f_nu(c / wave)
         else:
-            wave = float(wave)
+            return self.f_nu(c / float(wave))
 
-        # Some constants
-        c = 299792458e6 #in microns
-        h = 6.6260693e-34 #J/s
-        k = 1.3806505e-23 #J/K
-        hcokt = h * c / (k * self._T)
+    def freq_integrate(self, minwave, maxwave):
+        """Integrate f_nu over specified wavelength range
 
-        # Convert wavelengths to x = h nu / k T
-        x = hcokt / wave
+        Parameters:
+        -----------
+        minwave : float
+          Minimum wavlength, in microns
+
+        maxwave : float
+          Maximum wavelength, in microns
+
+        Returns
+        -------
+        fint : float
+          The integral in erg/s/cm^2
+        """
         
-        if x.min() <= 0.0:
-            raise ValueError("Invalid (non-positive) wavelengths")
+        from scipy.integrate import quad
 
-        # Two cases -- optically thin and not.
-        #  Each has two sub-cases -- with power law merge and without
-        if self._opthin:
-            if not self._hasalpha:
-                retval = self._normfac * x**(3.0 + self._beta) / numpy.expm1(x)
-            else:
-                retval = numpy.zeros_like(wave)
-                if wviter:
-                    ispower = x > self._xmerge
-                    retval[ispower] = self._kappa * x[ispower]**(-self._alpha)
-                    retval[~ispower] = x[~ispower]**(3.0 + self._beta) / \
-                        numpy.expm1(x[~ispower])
-                    retval *= self._normfac
-                else:
-                    if x > self._xmerge:
-                        retval = self._normfac * self._kappa * x**(-self._alpha)
-                    else:
-                        retval = self._normfac * x**(3.0 + self._beta) / \
-                            numpy.expm1(x)
-        else:
-            if not self._hasalpha:
-                retval = - self._normfac * \
-                    numpy.expm1(-(x / self._x0)**self._beta) * x**3 / \
-                    numpy.expm1(x)
-            else :
-                retval = numpy.zeros_like(wave)
-                if wviter:
-                    ispower = x > self._xmerge
-                    retval[ispower] = self._kappa * x[ispower]**(-self._alpha)
-                    retval[~ispower] = \
-                        - numpy.expm1( - (x[~ispower]/self._x0)**self._beta) * \
-                        x[~ispower]**3/numpy.expm1(x[~ispower])
-                    retval *= self._normfac
-                else:
-                    if x > self._xmerge:
-                        retval = self._normfac * self._kappa * \
-                            x**(-self._alpha)
-                    else:
-                        retval = -self._normfac * x**3 * \
-                            numpy.expm1( - (x / self._x0)**self._beta) /\
-                            numpy.expm1(x)
-        return retval
+        minwave = float(minwave)
+        maxwave = float(maxwave)
+
+        if minwave <= 0.0:
+            raise ValueError("Minimum wavelength must be > 0.0")
+        if minwave > maxwave:
+            minwave, maxwave = maxwave, minwave
+        
+        # Tricky thing -- we are integrating over frequency (in GHz),
+        # not wavelength
+        c = 299792458e-3
+        minfreq = c / maxwave
+        maxfreq = c / minwave
+
+        fint = quad(self.f_nu, minfreq, maxfreq)[0]
+
+        # Integral comes back in mJy-GHz, convert to erg/s/cm^2
+        return 1e-17 * fint
+        

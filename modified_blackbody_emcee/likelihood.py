@@ -8,20 +8,14 @@ __all__ = ["likelihood"]
 """Class holding data, defining likelihood"""
 class likelihood(object) :
     def __init__(self, photfile, covfile=None, covextn=0, 
-                 wavenorm=500.0, noalpha=False, opthin=False, 
-                 compute_lir=False, redshift=None) :
+                 wavenorm=500.0, noalpha=False, opthin=False) :
         """Photfile is the name of the photometry file, covfile the name
         of a fits file holding the covariance matrix (if present), which
         is in extension covextn.  The wavelength normalizing the SED is
         wavenorm (in microns)."""
-        if redshift is None:
-            self._z = None
-        else:
-            self._z = float(redshift)
         self._wavenorm = float(wavenorm)
         self._noalpha = bool(noalpha)
         self._opthin = bool(opthin)
-        self._compute_lir = bool(compute_lir)
 
         # Set up information about fixed params, param limits, and
         # priors.
@@ -49,25 +43,14 @@ class likelihood(object) :
         # Data
         self.read_phot(photfile)
         if not covfile is None :
-            self.read_cov( string(covfile), extn=covextn )
+            if not isinstance(covfile, basestring):
+                raise TypeError("covfile must be string-like")
+            self.read_cov(covfile, extn=covextn)
         else:
             self._has_covmatrix = False
 
         # Reset normalization flux lower limit based on data
         self._lowlim[4] = 1e-3 * self._flux.min()
-
-        if self._compute_lir:
-            if self._z is None:
-                raise ValueError("Must provide redshift if computing L_IR")
-            # Get luminosity distance in cm
-            dl = astropy.cosmology.WMAP7.luminosity_distance(self._z)
-            # 4*pi*dl^2/L_sun in cgs -- so the output will be in 
-            # solar luminosities; the prefactor is
-            # 4 * pi * mpc_to_cm^2/L_sun
-            self._lirprefac = 3.11749657e16 * dl**2
-            opz = 1.0 + self._z
-            self._minfreq_lir = 299792458e-3/1000.0/opz #1000um rest
-            self._maxfreq_lir = 299792458e-3/8.0/opz #8um rest
 
         self._badval = float("-inf")
 
@@ -75,6 +58,8 @@ class likelihood(object) :
         """Reads in the photometry file, storing the wave [um],
         flux [mJy] and uncertainties [mJy]"""
         import asciitable
+        if not isinstance(filename, basestring):
+            raise TypeError("filename must be string-like")
         data = asciitable.read(filename,comment='^#')
         if len(data) == 0 :
             errstr = "No data read from %s" % filename
@@ -96,7 +81,6 @@ class likelihood(object) :
         """Reads in the covariance matrix from the specified
         extension of the input FITS file (in extension extn)"""
         import pyfits
-        import np.linalg
         hdu = pyfits.open(filename)
         self._covmatrix = hdu[extn].data
         if self._covmatrix.shape[0] != self._covmatrix.shape[1] :
@@ -249,25 +233,3 @@ class likelihood(object) :
 
         return lnlike
 
-        # Possibly compute L_ir for metadata blob
-        #if self._compute_lir:
-        #    lir = self._lirprefac * \
-        #        self._freqint(self._minfreq_lir, self._maxfreq_lir,
-        #                      step=0.25)
-        #    return lnlike, lir
-        #else:
-        #    return lnlike
-
-    def _freqint(self, minfreq, maxfreq, step=0.1) :
-        """Integrates greybody between minfreq/maxfreq (in GHz)
-
-        The integral is returned in erg/s/cm^2.
-        minfreq and maxfreq are in GHz, as is step.
-
-        The parameters must already be set in the SED model
-        """
-        freq = np.arange(minfreq,maxfreq,step)
-        waveln = 299792458e-3/freq
-        ifac = step*1e-17 
-        return np.sum(self._sed(waveln)) * ifac
-    
