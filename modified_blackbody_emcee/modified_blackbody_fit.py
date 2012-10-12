@@ -28,11 +28,16 @@ class modified_blackbody_results(object):
             self.dustmass = fit.dustmass
         except AttributeError:
             pass
+        try:
+            self.peaklambda = fit.peaklambda
+        except AttributeError:
+            pass
 
 
 # Set up class to do fit
 class modified_blackbody_fit(object):
-    """Does fit"""
+    """ Does fit"""
+
     def __init__(self, photfile, covfile, covextn, wavenorm, noalpha, 
                  opthin, nwalkers, npar, threads):
         self._noalpha = noalpha
@@ -44,6 +49,7 @@ class modified_blackbody_fit(object):
         self.sampler = emcee.EnsembleSampler(nwalkers, npar, self.like,
                                              threads=threads)
         self._sampled = False
+
     def run(self, nburn, nsteps, p0, verbose=False):
         """Do emcee run"""
 
@@ -87,8 +93,39 @@ class modified_blackbody_fit(object):
             except ImportError :
                 pass
 
+    def get_peaklambda(self):
+        """ Find the wavelength of peak emission from chain"""
+
+        shp = self.sampler.chain.shape[0:2]
+        self.peaklambda = numpy.empty(shp, dtype=numpy.float)
+        for walkidx in range(shp[0]):
+            # Do first step
+            prevstep = self.sampler.chain[walkidx,0,:]
+            sed = modified_blackbody(prevstep[0], prevstep[1], prevstep[2],
+                                     prevstep[3], prevstep[4], 
+                                     opthin=self._opthin,
+                                     noalpha=self._noalpha)
+            self.peaklambda[walkidx, 0] = sed.max_wave()
+            
+            #Now other steps
+            for stepidx in range(1, steps):
+                currstep = self.sampler.chain[walkidx,stepidx,:]
+                if numpy.allclose(prevstep, currstep):
+                    # Repeat, so avoid re-computation
+                    self.peaklambda[walkidx, stepidx] = \
+                        self.peaklambda[walkidx, stepidx-1]
+                else:
+                    sed = modified_blackbody(currstep[0], currstep[1], 
+                                             currstep[2], currstep[3], 
+                                             currstep[4], 
+                                             opthin=self._opthin,
+                                             noalpha=self._noalpha)
+                    self.peaklambda[walidx, stepidx] =\
+                        sed.max_wave()
+                    prevstep = currstep
+
     def get_lir(self, redshift, maxidx=None):
-        """Get 8-1000 micron LIR from chain"""
+        """ Get 8-1000 micron LIR from chain"""
         try:
             import astropy.cosmology
         except ImportError:

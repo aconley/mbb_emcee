@@ -90,6 +90,8 @@ if __name__ == "__main__":
                         help="Get the rest frame 42.5 to 122.5um lumiosity.  You must set the redshift")
     parser.add_argument('--get_lir',action='store_true',default=False,
                         help="Get the rest frame 8-1000um luminosity.  You must set the redshift")
+    parser.add_argument('--get_peaklambda', action='store_true', default=False,
+                        help="Get the observer frame SED peak wavelength")
     parser.add_argument("--lowT",action='store',type=float,default=None,
                         help="Lower limit on T (Def:0)")
     parser.add_argument("--lowBeta",action='store',type=float,default=None,
@@ -254,6 +256,11 @@ if __name__ == "__main__":
 
     # Do fit
     fit.run(parse_results.burn, parse_results.nsteps, p0, parse_results.verbose)
+
+    # Peak wavelength computation
+    if parse_results.get_peaklambda:
+        if parse_results.verbose: print "Computing peak obs-frame wavelength"
+        fit.get_peaklambda()
 
     # L_IR computation
     if parse_results.get_lir: 

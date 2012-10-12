@@ -291,7 +291,7 @@ class modified_blackbody(object):
         return retval
 
     def __call__(self, wave):
-        """Evaluate modified blackbody at specified wavelengths
+        """ Evaluate modified blackbody at specified wavelengths
 
         Parameters
         ----------
@@ -311,6 +311,93 @@ class modified_blackbody(object):
             return self.f_nu(c / wave)
         else:
             return self.f_nu(c / float(wave))
+
+    def _snudev(self, x):
+        """ Evaluates derivative (modulo normalization) of S_nu at x
+
+        x = h nu / k T (scalar)
+
+        Ignores alpha side, since that should be rising -- so the peak
+        should lie at lower frequency than the merge to the alpha law"""
+        
+        if self._opthin:
+            efac = math.expm1(x)
+            return x**(2.0 + self._beta) * (3.0 + self._beta) / efac - \
+                math.exp(x) * x**(3.0 + self._beta) / efac**2
+        else:
+            efac = math.expm1(x)
+            xx0 = x / self._x0
+            try:
+                xx0b = xx0**self._beta
+                ebfac = - math.expm1(-xx0b)
+                return 3 * x**2 * ebfac / efac -\
+                    math.exp(x) * x**3 * ebfac / efac**2 +\
+                    self._beta * x**3 * math.exp(-xx0b) * xx0b / \
+                    (x * efac)
+            except OverflowError:
+                # (x/x0)**beta is too large, which simplifies the expression
+                return 3 * x**2 / efac - math.exp(x) * x**3 / efac**2
+
+    def max_wave(self):
+        """ Attempt to find the wavelength of maximum emission
+
+        Returns
+        -------
+        wave : float
+         The wavelength of the maximum in microns
+        """
+        
+        # Note that the alpha portion is ignored, since we
+        # require alpha to be positive.  That means that
+        # the power law part should be rising where it joins
+        # the modified blackbody part, and therefore it should
+        # not affect anything
+
+        from scipy.optimize import brentq
+
+        # Start with an expression for the maximum of a normal
+        # blackbody.  We work in x = h nu / k T 
+        c = 299792458e6 #in microns
+        h = 6.6260693e-34 #J/s
+        k = 1.3806505e-23 #J/K
+        xmax_bb = 2.82144
+        numax_bb = xmax_bb * k * self._T / h
+        if (self._opthin and self._beta == 0):
+            # This is just a blackbody, so easy cakes
+            return c / numax_bb
+
+        # Now, bracket the root in the derivative.
+        # At low x (low frequency) the derivative should be positive
+        a = xmax_bb / 2.0
+        aval = self._snudev(a)
+        maxiters = 20
+        iter = 0
+        while aval <= 0.0:
+            if iter > maxiters:
+                errmsg = "Couldn't bracket maximum from low frequency side"
+                raise Exception(errmsg)
+            a /= 2.0
+            aval = self._snudev(a)
+            iter += 1
+
+        # And the derivative should be negative at high frequencies
+        b = xmax_bb * 2.0
+        bval = self._snudev(b)
+        iter = 0
+        while bval >= 0.0:
+            if iter > maxiters:
+                errmsg = "Couldn't bracket maximum from high frequency side"
+                raise Exception(errmsg)
+            b *= 2.0
+            bval = self._snudev(b)
+            iter += 1
+        
+        # Now find the actual root
+        xmax = brentq(self._snudev, a, b, disp=True)
+
+        # Convert to more conventional units
+        numax = xmax * k * self._T / h
+        return c / numax
 
     def freq_integrate(self, minwave, maxwave):
         """Integrate f_nu over specified wavelength range
