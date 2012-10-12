@@ -24,14 +24,14 @@ if __name__ == "__main__":
 
     The model is (schematically)
 
-      S_nu = (1-exp(-tau)) B_nu,
+      S_nu \propto (1-exp(-tau)) B_nu,
 
     where B_nu is the Planck function, and tau is the optical depth, assumed
     of the form
 
       tau = (nu/nu0)^beta.
 
-    The fit parameters are:
+    The fit parameters are (in this order):
       T:  The observer frame temperature in [K] (Trest/(1+z))
 
       beta: The dust attenuation slope
@@ -142,7 +142,7 @@ if __name__ == "__main__":
     parser.add_argument("-v","--verbose",action="store_true",default=False,
                         help="Print status messages")
     parser.add_argument('-V','--version',action='version',
-                        version='%(prog)s 1.0')
+                        version='%(prog)s 0.1.2')
     parser.add_argument('-w','--wavenorm',action='store', 
                         type=float, default=500.0,
                         help="Observer frame wavelength of normalization (def: 500)")

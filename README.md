@@ -15,12 +15,26 @@ The command line routine is
 Help can be obtained via
 	modified_blackbody_emcee.py --help
 
+This produces a pickled save file containing the results.
+You can obtain parameter ranges and limits by reading
+in the results and examining them.  Note that all the
+blackbody parameters (temperature, etc.) are in the observer frame.
+If picklefile is a string holding the name of the output file:
+	import pickle
+	results = pickle.load(open(picklefile,'rb'))
+        T_val = results.parcen(0)
+	print "Obs frame Temperature: {:0.2f}+{:0.2f}-{:0.2f}".format(*T_val)
+	b_val = results.parcen(1)
+	print "Beta: {:0.2f}+{:0.2f}-{:0.2f}".format(*b_val)
+
 ###Dependencies
 This depends on a number of python packages:
 * [numpy](http://http://numpy.scipy.org/)
 * [scipy](http://http://numpy.scipy.org/)
 * [pyfits](http://http://www.stsci.edu/institute/software_hardware/pyfits)
 * And, perhaps most importantly, [emcee](http://http://danfm.ca/emcee/)
+* If you want to compute dust masses, you will also need
+  [astropy](http://www.astropy.org/)
 
 ### References
 * The affine invariant MCMC code is described in

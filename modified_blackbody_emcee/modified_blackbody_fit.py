@@ -33,6 +33,63 @@ class modified_blackbody_results(object):
         except AttributeError:
             pass
 
+    def bestfit(self):
+        """ Finds the best fitting point that occurred during the fit
+
+        Returns a tuple of the parameters, the log probability, and the
+        index into lnprobability"""
+
+        idxmax_flat = self.lnprobability.argmax()
+        idxmax = numpy.unravel_index(idxmax_flat, self.lnprobability.shape)
+        return (self.chain[idxmax[0], idxmax[1], :],
+                self.lnprobability[idxmax[0], idxmax[1]],
+                idxmax)
+
+    def parcen(self, paridx, percentile=0.683):
+        """ Gets the central confidence interval for the parameter
+
+        The parameters are in the order T, beta, lambda0, alpha, fnorm"""
+
+        if percentile <= 0 or percentile >= 1.0:
+            raise ValueError("percentile needs to be between 0 and 1")
+        if paridx < 0 or paridx > 5:
+            raise ValueError("invalid parameter index %d" % paridx)
+
+        svals = self.chain[:,:,paridx].flatten()
+        svals.sort()
+        mnval = numpy.mean(svals)
+        pval = (1.0-percentile)/2
+        lowval = svals[round(pval * len(svals))]
+        upval  = svals[round((1.0 - pval) * len(svals))]
+        return (mnval, upval-mnval, mnval-lowval)
+
+    def par_lowlim(self, paridx, percentile=0.683):
+        """ Gets the lower limit for the parameter
+
+        The parameters are in the order T, beta, lambda0, alpha, fnorm"""
+
+        if percentile <= 0 or percentile >= 1.0:
+            raise ValueError("percentile needs to be between 0 and 1")
+        if paridx < 0 or paridx > 5:
+            raise ValueError("invalid parameter index %d" % paridx)
+
+        svals = self.chain[:,:,paridx].flatten()
+        svals.sort()
+        return svals[round((1.0 - percentile) * len(svals))]
+
+    def par_uplim(self, paridx, percentile=0.683):
+        """ Gets the upper limit for the parameter
+
+        The parameters are in the order T, beta, lambda0, alpha, fnorm"""
+
+        if percentile <= 0 or percentile >= 1.0:
+            raise ValueError("percentile needs to be between 0 and 1")
+        if paridx < 0 or paridx > 5:
+            raise ValueError("invalid parameter index %d" % paridx)
+
+        svals = self.chain[:,:,paridx].flatten()
+        svals.sort()
+        return svals[round(percentile * len(svals))]
 
 # Set up class to do fit
 class modified_blackbody_fit(object):
@@ -81,8 +138,8 @@ class modified_blackbody_fit(object):
             try :
                 acor = self.sampler.acor
                 print " Autocorrelation time: "
-                print "  Number of steps (%d) should be larger than these" % \
-                    nsteps
+                print "  Number of burn in steps (%d) should be larger than these" % \
+                    nburn
                 print "\tT:        %f" % acor[0]
                 print "\tbeta:     %f" % acor[1]
                 if not self._opthin:
@@ -108,7 +165,7 @@ class modified_blackbody_fit(object):
             self.peaklambda[walkidx, 0] = sed.max_wave()
             
             #Now other steps
-            for stepidx in range(1, steps):
+            for stepidx in range(1, shp[1]):
                 currstep = self.sampler.chain[walkidx,stepidx,:]
                 if numpy.allclose(prevstep, currstep):
                     # Repeat, so avoid re-computation
@@ -120,7 +177,7 @@ class modified_blackbody_fit(object):
                                              currstep[4], 
                                              opthin=self._opthin,
                                              noalpha=self._noalpha)
-                    self.peaklambda[walidx, stepidx] =\
+                    self.peaklambda[walkidx, stepidx] =\
                         sed.max_wave()
                     prevstep = currstep
 

@@ -25,6 +25,6 @@ setup(
         "Operating System :: OS Independent",
         "Programming Language :: Python",
     ],
-    requires = ['numpy (>1.5.0)', 'emcee (>1.0.0)']
+    requires = ['numpy (>1.5.0)', 'emcee (>1.0.0)', 'scipy']
 )
 
