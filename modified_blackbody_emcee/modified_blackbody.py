@@ -70,15 +70,16 @@ class modified_blackbody(object):
 
         self._T = float(T)
         self._beta = float(beta)
-        self._lambda0 = float(lambda0)
         self._hasalpha = not bool(noalpha)
         self._alpha = float(alpha)
         self._fnorm = float(fnorm)
         self._wavenorm = float(wavenorm)
         if bool(opthin):
             self._opthin = True
+            self._lambda0 = None
         else:
             self._opthin = False
+            self._lambda0 = float(lambda0)
             
         if self._hasalpha and alpha <= 0.0:
             errmsg = "alpha must be positive.  You gave: %.5g" % self._alpha
@@ -91,11 +92,12 @@ class modified_blackbody(object):
         c = 299792458e6 #in microns
         h = 6.6260693e-34 #J/s
         k = 1.3806505e-23 #J/K
-        hcokt = h * c / (k * self._T)
+        self._hcokt = h * c / (k * self._T)
 
         # Convert wavelengths to x = h nu / k T
-        self._x0 = hcokt / lambda0
-        self._xnorm = hcokt / self._wavenorm
+        if not self._opthin:
+            self._x0 = self._hcokt / lambda0
+        self._xnorm = self._hcokt / self._wavenorm
 
         # Two cases -- optically thin and not.
         #  Each has two sub-cases -- with power law merge and without
@@ -228,6 +230,14 @@ class modified_blackbody(object):
     @property
     def optically_thin(self):
         return self._opthin
+
+    @property
+    def wavemerge(self):
+        """Get the merge wavelength [microns]"""
+        if not self._hasalpha:
+            return None
+        else:
+            return self._hcokt / self._xmerge
 
     def __repr__(self):
         retstr = "T: %.4g beta: %.4g lambda0: %.4g alpha: %.4g fnorm: %.4g"

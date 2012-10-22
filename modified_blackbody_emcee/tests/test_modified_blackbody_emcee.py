@@ -50,5 +50,26 @@ class MBB(unittest.TestCase):
         wave = np.array([500.0, 850.0, 1100.0, 2500.0])
         self.assert_(np.allclose(mbb_thin(wave), mbb_thick(wave), rtol=1e-3))
 
+    def testMerge(self):
+        """ Test alpha law merge"""
+        # Comparison values computed with Mathematica NSolve
+        # Start with optically thin
+        mbb = modified_blackbody(20.0, 1.9, None, 3.5, 50.0, noalpha=True,
+                                 opthin=True)
+        self.assertIsNone(mbb.wavemerge)
+        mbb = modified_blackbody(20.0, 1.9, None, 3.5, 50.0, opthin=True)
+        self.assert_(np.allclose(mbb.wavemerge, 85.66065, rtol=1e-3))
+        mbb = modified_blackbody(35.0, 2.2, None, 2.8, 50.0, opthin=True)
+        self.assert_(np.allclose(mbb.wavemerge, 51.40211, rtol=1e-3))
+        
+        # More difficult optically thick case
+        mbb = modified_blackbody(20.0, 1.9, 250.0, 3.5, 50.0, noalpha=True)
+        self.assertIsNone(mbb.wavemerge)
+        mbb = modified_blackbody(20.0, 1.9, 250.0, 3.5, 50.0)
+        self.assert_(np.allclose(mbb.wavemerge, 109.5506829, rtol=1e-3))
+        mbb = modified_blackbody(40.0, 1.5, 600.0, 3.0, 50.0)
+        self.assert_(np.allclose(mbb.wavemerge, 60.10021595, rtol=1e-3))
+
+        
 if __name__ == "__main__":
     unittest.main()
