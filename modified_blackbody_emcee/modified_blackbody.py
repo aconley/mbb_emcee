@@ -70,10 +70,16 @@ class modified_blackbody(object):
 
         self._T = float(T)
         self._beta = float(beta)
-        self._hasalpha = not bool(noalpha)
-        self._alpha = float(alpha)
+        if bool(noalpha):
+            self._hasalpha = False
+            self._alpha = None
+        else:
+            self._hasalpha = True
+            self._alpha = float(alpha)
+
         self._fnorm = float(fnorm)
         self._wavenorm = float(wavenorm)
+
         if bool(opthin):
             self._opthin = True
             self._lambda0 = None
@@ -84,8 +90,8 @@ class modified_blackbody(object):
         if self._hasalpha and alpha <= 0.0:
             errmsg = "alpha must be positive.  You gave: %.5g" % self._alpha
             raise ValueError(errmsg)
-        if self._beta <= 0.0:
-            errmsg = "beta must be positive.  You gave: %.5g" % self._beta
+        if self._beta < 0.0:
+            errmsg = "beta must be non-negative.  You gave: %.5g" % self._beta
             raise ValueError(errmsg)
 
         # Some constants
