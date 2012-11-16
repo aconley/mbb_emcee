@@ -133,8 +133,8 @@ class likelihood(object) :
 
         self._any_gprior = True
         self._has_gprior[paramidx] = True
-        self._gprior_mean = float(mean)
-        self._gprior_ivar = 1.0 / (float(sigma)**2)
+        self._gprior_mean[paramidx] = float(mean)
+        self._gprior_ivar[paramidx] = 1.0 / (float(sigma)**2)
 
 
     def _check_lowlim(self,pars) :

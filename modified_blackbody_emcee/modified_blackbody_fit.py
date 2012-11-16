@@ -3,6 +3,7 @@ import emcee
 import math
 from modified_blackbody import modified_blackbody
 from likelihood import likelihood
+import copy
 
 __all__ = ["modified_blackbody_fit", "modified_blackbody_results"]
 
@@ -45,7 +46,36 @@ class modified_blackbody_results(object):
                 self.lnprobability[idxmax[0], idxmax[1]],
                 idxmax)
 
-    def parcen(self, paridx, percentile=0.683):
+    def _parcen_internal(self, array, percentile):
+        aint = copy.deepcopy(array)
+        aint.sort()
+        mnval = numpy.mean(aint)
+        pval = (1.0-percentile)/2
+        lowval = aint[round(pval * len(aint))]
+        upval  = aint[round((1.0 - pval) * len(aint))]
+        return (mnval, upval-mnval, mnval-lowval)
+    
+    def peaklambda_cen(self, percentile=0.683):
+        """ Gets the central confidence interval for the peak lambda"""
+        if not hasattr(self, 'peaklambda'): return None
+        return self._parcen_internal(self.peaklambda.flatten(), percentile)
+
+    def lir_cen(self, percentile=0.683):
+        """ Gets the central confidence interval for L_IR"""
+        if not hasattr(self, 'lir'): return None
+        return self._parcen_internal(self.lir.flatten(), percentile)
+
+    def lagn_cen(self, percentile=0.683):
+        """ Gets the central confidence interval for L_IR"""
+        if self.hasattr(self, 'lagn'): return None
+        return self._parcen_internal(self.lagn.flatten(), percentile)
+
+    def dustmass_cen(self, percentile=0.683):
+        """ Gets the central confidence interval for dustmass"""
+        if not hasattr(self, 'dustmass'): return None
+        return self._parcen_internal(self.dustmass.flatten(), percentile)
+
+    def par_cen(self, paridx, percentile=0.683):
         """ Gets the central confidence interval for the parameter
 
         The parameters are in the order T, beta, lambda0, alpha, fnorm"""
@@ -55,13 +85,8 @@ class modified_blackbody_results(object):
         if paridx < 0 or paridx > 5:
             raise ValueError("invalid parameter index %d" % paridx)
 
-        svals = self.chain[:,:,paridx].flatten()
-        svals.sort()
-        mnval = numpy.mean(svals)
-        pval = (1.0-percentile)/2
-        lowval = svals[round(pval * len(svals))]
-        upval  = svals[round((1.0 - pval) * len(svals))]
-        return (mnval, upval-mnval, mnval-lowval)
+        return self._parcen_internal(self.chain[:,:,paridx].flatten(), 
+                                     percentile)
 
     def par_lowlim(self, paridx, percentile=0.683):
         """ Gets the lower limit for the parameter

@@ -211,19 +211,19 @@ if __name__ == "__main__":
     # Priors
     if not parse_results.priorT is None:
         fit.like.set_gaussian_prior(0, parse_results.priorT[0], 
-                                                  parse_results.priorT[1])
+                                    parse_results.priorT[1])
     if not parse_results.priorBeta is None:
         fit.like.set_gaussian_prior(1, parse_results.priorBeta[0],
-                                                  parse_results.priorBeta[1])
+                                    parse_results.priorBeta[1])
     if (not parse_results.opthin) and (not parse_results.priorLambda0 is None):
         fit.like.set_gaussian_prior(2, parse_results.priorLambda0[0], 
-                                                  parse_results.priorLambda0[1])
+                                    parse_results.priorLambda0[1])
     if (not parse_results.noalpha) and (not parse_results.priorT is None):
         fit.like.set_gaussian_prior(3, parse_results.priorAlpha[0], 
-                                                  parse_results.priorAlpha[1])
+                                    parse_results.priorAlpha[1])
     if not parse_results.priorFnorm is None:
         fit.like.set_gaussian_prior(4, parse_results.priorFnorm[0], 
-                                                  parse_results.priorFnorm[1])
+                                    parse_results.priorFnorm[1])
 
 
     # initial values -- T, beta, lambda0, alpha, fnorm
