@@ -10,7 +10,7 @@ if (major == 3):
 
 setup(
     name="modified_blackbody_emcee",
-    version="1.0.0",
+    version="1.0.1",
     author="Alexander Conley",
     author_email="alexander.conley@colorado.edu",
     packages=["modified_blackbody_emcee"],

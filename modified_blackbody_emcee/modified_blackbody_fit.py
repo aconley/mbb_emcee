@@ -1,6 +1,7 @@
 import numpy
 import emcee
 import math
+import multiprocessing
 from modified_blackbody import modified_blackbody
 from likelihood import likelihood
 import copy
@@ -66,8 +67,8 @@ class modified_blackbody_results(object):
         return self._parcen_internal(self.lir.flatten(), percentile)
 
     def lagn_cen(self, percentile=0.683):
-        """ Gets the central confidence interval for L_IR"""
-        if self.hasattr(self, 'lagn'): return None
+        """ Gets the central confidence interval for L_AGN"""
+        if not hasattr(self, 'lagn'): return None
         return self._parcen_internal(self.lagn.flatten(), percentile)
 
     def dustmass_cen(self, percentile=0.683):
@@ -116,20 +117,102 @@ class modified_blackbody_results(object):
         svals.sort()
         return svals[round(percentile * len(svals))]
 
+# This is a class that does frequency integration
+# The idea is to allow this to also be multiprocessed
+class modified_blackbody_freqint(object):
+    """ Does frequency integration"""
+    
+    def __init__(self, redshift, lammin, lammax, opthin=False,
+                 noalpha=False):
+        """
+        Parameters
+        __________
+        redshift : float
+           Redshift of the object
+        
+        lammin : float
+           Minimum wavelength of frequency integral, in microns
+
+        lammax : float
+           Maximum wavelength of frequency integral, in microns
+
+        opthin : bool
+           Is the integration optically thin?
+
+        noalpha : bool
+           Ignore alpha
+        """
+
+        self._redshift = float(redshift)
+        self._lammin = float(lammin)
+        self._lammax = float(lammax)
+        self._opthin = bool(opthin)
+        self._noalpha = bool(noalpha)
+
+        if self._redshift < 0:
+            raise Exception("Invalid (negative) redshift: %f" % self._redshift)
+        if self._lammin <= 0:
+            raise Exception("Invalid (non-positive) lammin: %f" % self._lammin)
+        if self._lammax <= 0:
+            raise Exception("Invalid (non-positive) lammax: %f" % self._lammax)
+        if self._lammin > self._lammax:
+            self._lammin, self._lammax = self._lammax, self._lammin            
+
+        opz = 1.0 + self._redshift
+        self._minwave_obs = self._lammin * opz
+        self._maxwave_obs = self._lammax * opz
+        
+
+    def __call__(self, params):
+        """ Evaluates frequency integral."""
+        mbb = modified_blackbody(params[0], params[1], params[2],
+                                 params[3], params[4], opthin=self._opthin,
+                                 noalpha=self._noalpha)
+        return mbb.freq_integrate(self._minwave_obs, self._maxwave_obs)
+
 # Set up class to do fit
 class modified_blackbody_fit(object):
     """ Does fit"""
 
     def __init__(self, photfile, covfile, covextn, wavenorm, noalpha, 
-                 opthin, nwalkers, npar, threads):
+                 opthin, nwalkers, nthreads):
+        """
+        Parameters
+        __________
+        photfile : string
+           Text file containing photometry
+        
+        covfile : string
+           FITS file containing covariance matrix. None for no file
+
+        covextn : integer
+           Extension of covaraince file
+
+        wavenorm : float
+           Wavelength of normalization in microns
+
+        noalpha : bool
+           Ignore alpha in fit
+
+        opthin : bool
+           Assume optically thin
+
+        nwalkers : integer
+           Number of MCMC walkers to use in fit
+
+        nthreads : integer
+           Number of threads to use
+        """
+
         self._noalpha = noalpha
         self._opthin = opthin
         self._wavenorm = float(wavenorm)
+        self._nthreads = int(nthreads)
         self.like = likelihood(photfile, covfile=covfile, covextn=covextn, 
                                wavenorm=wavenorm, noalpha=noalpha, 
                                opthin=opthin)
-        self.sampler = emcee.EnsembleSampler(nwalkers, npar, self.like,
-                                             threads=threads)
+        self.sampler = emcee.EnsembleSampler(nwalkers, 5, self.like,
+                                             threads=self._nthreads)
         self._sampled = False
 
     def run(self, nburn, nsteps, p0, verbose=False):
@@ -176,7 +259,7 @@ class modified_blackbody_fit(object):
                 pass
 
     def get_peaklambda(self):
-        """ Find the wavelength of peak emission from chain"""
+        """ Find the wavelength of peak emission in microns from chain"""
 
         shp = self.sampler.chain.shape[0:2]
         self.peaklambda = numpy.empty(shp, dtype=numpy.float)
@@ -207,7 +290,8 @@ class modified_blackbody_fit(object):
                     prevstep = currstep
 
     def get_lir(self, redshift, maxidx=None):
-        """ Get 8-1000 micron LIR from chain"""
+        """ Get 8-1000 micron LIR from chain in solar luminosities"""
+
         try:
             import astropy.cosmology
         except ImportError:
@@ -222,45 +306,49 @@ class modified_blackbody_fit(object):
         z = float(redshift)
         dl = astropy.cosmology.WMAP7.luminosity_distance(z) #Mpc
         lirprefac = 3.11749657e16 * dl**2
-        opz = 1.0 + z
 
         # L_IR defined as between 8 and 1000 microns (rest)
-        minwave = 8.0 * opz
-        maxwave = 1000 * opz
+        integrator = modified_blackbody_freqint(z, 8.0, 1000.0,
+                                                opthin=self._opthin,
+                                                noalpha=self._noalpha)
 
-        # Now we compute L_IR for every step taken, checking
-        # for repeats
-        shp = self.sampler.chain.shape[0:2]
-        steps = shp[1]
-        if not maxidx is None:
-            if maxidx < steps: steps = maxidx
-        self.lir = numpy.empty((shp[0],steps), dtype=numpy.float)
-        for walkidx in range(shp[0]):
-            # Do first step
-            prevstep = self.sampler.chain[walkidx,0,:]
-            sed = modified_blackbody(prevstep[0], prevstep[1], prevstep[2],
-                                     prevstep[3], prevstep[4], 
-                                     opthin=self._opthin,
-                                     noalpha=self._noalpha)
-            self.lir[walkidx,0] = \
-                lirprefac * sed.freq_integrate(minwave, maxwave)
-            for stepidx in range(1, steps):
-                currstep = self.sampler.chain[walkidx,stepidx,:]
-                if numpy.allclose(prevstep, currstep):
-                    # Repeat, so avoid re-computation
-                    self.lir[walkidx, stepidx] = self.lir[walkidx, stepidx-1]
-                else:
-                    sed = modified_blackbody(currstep[0], currstep[1], 
-                                             currstep[2], currstep[3], 
-                                             currstep[4], 
-                                             opthin=self._opthin,
-                                             noalpha=self._noalpha)
-                    self.lir[walkidx, stepidx] = \
-                        lirprefac * sed.freq_integrate(minwave, maxwave)
-                    prevstep = currstep
+        # Now we compute L_IR for every step taken.
+        # Two cases: using multiprocessing, and serially.
+        if self._nthreads > 1:
+            shp = self.sampler.chain.shape[0:2]
+            npar = self.sampler.chain.shape[2]
+            nel = shp[0] * shp[1]
+            pool = multiprocessing.Pool(self._nthreads)
+            rchain = self.sampler.chain.reshape(nel, npar)
+            lir = numpy.array(pool.map(integrator,
+                                       [rchain[i] for i in xrange(nel)]))
+            self.lir = lirprefac * lir.reshape((shp[0], shp[1]))
+        else :
+            # Explicitly check for repeats
+            shp = self.sampler.chain.shape[0:2]
+            steps = shp[1]
+            if not maxidx is None:
+                if maxidx < steps: steps = maxidx
+            self.lir = numpy.empty((shp[0],steps), dtype=numpy.float)
+            for walkidx in range(shp[0]):
+                # Do first step
+                prevstep = self.sampler.chain[walkidx,0,:]
+                self.lir[walkidx,0] = \
+                    lirprefac * integrator(prevstep)
+                for stepidx in range(1, steps):
+                    currstep = self.sampler.chain[walkidx,stepidx,:]
+                    if numpy.allclose(prevstep, currstep):
+                        # Repeat, so avoid re-computation
+                        self.lir[walkidx, stepidx] =\
+                            self.lir[walkidx, stepidx-1]
+                    else:
+                        self.lir[walkidx, stepidx] = \
+                            lirprefac * integrator(prevstep)
+                        prevstep = currstep
 
     def get_lagn(self, redshift, maxidx=None):
-        """Get 42.5-112.5 micron luminosity from chain"""
+        """Get 42.5-112.5 micron luminosity from chain in solar luminosites"""
+
         try:
             import astropy.cosmology
         except ImportError:
@@ -277,42 +365,45 @@ class modified_blackbody_fit(object):
         # solar luminosities; the prefactor is
         # 4 * pi * mpc_to_cm^2/L_sun
         lagnprefac = 3.11749657e16 * dl**2
-        opz = 1.0 + z
 
-        # L_IR defined as between 8 and 1000 microns (rest)
-        minwave = 42.5 * opz
-        maxwave = 122.5 * opz
+        # L_IR defined as between 42.5 and 122.5 microns (rest)
+        integrator = modified_blackbody_freqint(z, 42.5, 122.5,
+                                                opthin=self._opthin,
+                                                noalpha=self._noalpha)
+        # Now we compute L_AGN for every step taken.
+        # Two cases: using multiprocessing, and serially.
+        if self._nthreads > 1:
+            shp = self.sampler.chain.shape[0:2]
+            npar = self.sampler.chain.shape[2]
+            nel = shp[0] * shp[1]
+            pool = multiprocessing.Pool(self._nthreads)
+            rchain = self.sampler.chain.reshape(nel, npar)
+            lagn = numpy.array(pool.map(integrator,
+                                        [rchain[i] for i in xrange(nel)]))
+            self.lagn = lagnprefac * lagn.reshape(shp[0], shp[1])
+        else :
+            # Explicitly check for repeats
+            shp = self.sampler.chain.shape[0:2]
+            steps = shp[1]
+            if not maxidx is None:
+                if maxidx < steps: steps = maxidx
+            self.lagn = numpy.empty((shp[0],steps), dtype=numpy.float)
+            for walkidx in range(shp[0]):
+                # Do first step
+                prevstep = self.sampler.chain[walkidx,0,:]
+                self.lagn[walkidx,0] = \
+                    lagnprefac * integrator(prevstep)
+                for stepidx in range(1, steps):
+                    currstep = self.sampler.chain[walkidx,stepidx,:]
+                    if numpy.allclose(prevstep, currstep):
+                        # Repeat, so avoid re-computation
+                        self.lagn[walkidx, stepidx] =\
+                            self.lagn[walkidx, stepidx-1]
+                    else:
+                        self.lagn[walkidx, stepidx] = \
+                            lagnprefac * integrator(prevstep)
+                        prevstep = currstep
 
-        # Now we compute L_IR for every step taken, checking
-        # for repeats
-        shp = self.sampler.chain.shape[0:2]
-        steps = shp[1]
-        if not maxidx is None:
-            if maxidx < steps: steps = maxidx
-        self.lagn = numpy.empty((shp[0],steps), dtype=numpy.float)
-        for walkidx in range(shp[0]):
-            # Do first step
-            prevstep = self.sampler.chain[walkidx,0,:]
-            sed = modified_blackbody(prevstep[0], prevstep[1], prevstep[2],
-                                     prevstep[3], prevstep[4], 
-                                     opthin=self._opthin,
-                                     noalpha=self._noalpha)
-            self.lagn[walkidx,0] = \
-                lagnprefac * sed.freq_integrate(minwave, maxwave)
-            for stepidx in range(1, steps):
-                currstep = self.sampler.chain[walkidx,stepidx,:]
-                if numpy.allclose(prevstep, currstep):
-                    # Repeat, so avoid re-computation
-                    self.lagn[walkidx, stepidx] = self.lagn[walkidx, stepidx-1]
-                else:
-                    sed = modified_blackbody(currstep[0], currstep[1], 
-                                             currstep[2], currstep[3], 
-                                             currstep[4], 
-                                             opthin=self._opthin,
-                                             noalpha=self._noalpha)
-                    self.lagn[walkidx, stepidx] = \
-                        lagnprefac * sed.freq_integrate(minwave, maxwave)
-                    prevstep = currstep
 
     def _dmass_calc(self, step, opz, bnu_fac, temp_fac, knu_fac,
                     opthin, dl2):
@@ -334,6 +425,8 @@ class modified_blackbody_fit(object):
         return dustmass
 
     def get_dustmass(self, redshift, maxidx=None):
+        # This one is not parallelized because the calculation
+        # is relatively trivial
         """Get dust mass in 10^8 M_sun from chain"""
         try:
             import astropy.cosmology

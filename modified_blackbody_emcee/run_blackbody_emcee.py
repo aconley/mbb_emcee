@@ -106,7 +106,7 @@ if __name__ == "__main__":
                         help="Directory to look for files in",
                         default=None)
     parser.add_argument('--maxidx',action='store',type=int,default=None,
-                        help="Maximum number of steps (per walker) to include in L_IR, L_AGN, and dustmass")
+                        help="Maximum number of steps (per walker) to include in L_IR, L_AGN, and dustmass.  Ignored if using threading.")
     parser.add_argument('-n','--nwalkers',action='store',type=int,
                         help="Number of walkers to use in MCMC (Def: 250)",
                         default=250)
@@ -173,7 +173,7 @@ if __name__ == "__main__":
 
     fit = modified_blackbody_fit(photfile, covfile, parse_results.covextn,
                                  parse_results.wavenorm, parse_results.noalpha,
-                                 parse_results.opthin, nwalkers, npar,
+                                 parse_results.opthin, nwalkers,
                                  parse_results.threads) 
     
     # Set parameters fixed/limits if present
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     if (not parse_results.opthin) and (not parse_results.priorLambda0 is None):
         fit.like.set_gaussian_prior(2, parse_results.priorLambda0[0], 
                                     parse_results.priorLambda0[1])
-    if (not parse_results.noalpha) and (not parse_results.priorT is None):
+    if (not parse_results.noalpha) and (not parse_results.priorAlpha is None):
         fit.like.set_gaussian_prior(3, parse_results.priorAlpha[0], 
                                     parse_results.priorAlpha[1])
     if not parse_results.priorFnorm is None:
