@@ -77,6 +77,27 @@ class likelihood(object) :
             self._has_uplim[2] = True
             self._uplim[2] = 5.0 * self._wave.max()
 
+    @property 
+    def data_wave(self):
+        if hasattr(self, '_wave'):
+            return self._wave
+        else:
+            return None
+
+    @property 
+    def data_flux(self):
+        if hasattr(self, '_flux'):
+            return self._flux
+        else:
+            return None
+
+    @property 
+    def data_flux_unc(self):
+        if hasattr(self, '_flux_unc'):
+            return self._flux_unc
+        else:
+            return None
+
     def read_cov(self, filename, extn=0) :
         """Reads in the covariance matrix from the specified
         extension of the input FITS file (in extension extn)"""
@@ -92,6 +113,17 @@ class likelihood(object) :
             raise ValueError(errstr)
         self._invcovmatrix = np.linalg.inv(self._covmatrix)
         self._has_covmatrix = True
+
+    @property
+    def has_data_covmatrix(self):
+        return self._has_covmatrix
+
+    @property
+    def data_covmatrix(self):
+        if self._has_covmatrix:
+            return self._covmatrix
+        else:
+            return None
 
     def fix_param(self, paramidx):
         """Fixes the specified parameter.

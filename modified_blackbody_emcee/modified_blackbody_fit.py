@@ -35,7 +35,7 @@ class modified_blackbody_results(object):
         except AttributeError:
             pass
 
-    def bestfit(self):
+    def best_fit(self):
         """ Finds the best fitting point that occurred during the fit
 
         Returns a tuple of the parameters, the log probability, and the
@@ -56,66 +56,87 @@ class modified_blackbody_results(object):
         upval  = aint[round((1.0 - pval) * len(aint))]
         return (mnval, upval-mnval, mnval-lowval)
     
-    def peaklambda_cen(self, percentile=0.683):
+    def peaklambda_cen(self, percentile=68.3):
         """ Gets the central confidence interval for the peak lambda"""
         if not hasattr(self, 'peaklambda'): return None
         return self._parcen_internal(self.peaklambda.flatten(), percentile)
 
-    def lir_cen(self, percentile=0.683):
+    @property
+    def lir_chain(self):
+        if not hasattr(self, 'lir'): return None
+        return self.lir.flatten()
+
+    def lir_cen(self, percentile=68.3):
         """ Gets the central confidence interval for L_IR"""
         if not hasattr(self, 'lir'): return None
         return self._parcen_internal(self.lir.flatten(), percentile)
 
-    def lagn_cen(self, percentile=0.683):
+    @property
+    def lagn_chain(self):
+        if not hasattr(self, 'lagn'): return None
+        return self.lagn.flatten()
+
+    def lagn_cen(self, percentile=68.3):
         """ Gets the central confidence interval for L_AGN"""
         if not hasattr(self, 'lagn'): return None
         return self._parcen_internal(self.lagn.flatten(), percentile)
 
-    def dustmass_cen(self, percentile=0.683):
+    @property
+    def dustmass_chain(self):
+        if not hasattr(self, 'dustmass'): return None
+        return self.dustmass.flatten()
+
+    def dustmass_cen(self, percentile=68.3):
         """ Gets the central confidence interval for dustmass"""
         if not hasattr(self, 'dustmass'): return None
         return self._parcen_internal(self.dustmass.flatten(), percentile)
 
-    def par_cen(self, paridx, percentile=0.683):
+    def parameter_chain(self, pardix):
+        """ Gets flattened chain for parameter number"""
+        if paridx < 0 or paridx > 5:
+            raise ValueError("invalid parameter index %d" % paridx)
+        return self.chain[:,:,paridx].flatten()
+
+    def par_cen(self, paridx, percentile=68.3):
         """ Gets the central confidence interval for the parameter
 
         The parameters are in the order T, beta, lambda0, alpha, fnorm"""
 
-        if percentile <= 0 or percentile >= 1.0:
-            raise ValueError("percentile needs to be between 0 and 1")
+        if percentile <= 0 or percentile >= 100.0:
+            raise ValueError("percentile needs to be between 0 and 100")
         if paridx < 0 or paridx > 5:
             raise ValueError("invalid parameter index %d" % paridx)
 
-        return self._parcen_internal(self.chain[:,:,paridx].flatten(), 
-                                     percentile)
+        return self._parcen_internal(self.parameter_chain(paridx), 
+                                     percentile*0.01)
 
-    def par_lowlim(self, paridx, percentile=0.683):
+    def par_lowlim(self, paridx, percentile=68.3):
         """ Gets the lower limit for the parameter
 
         The parameters are in the order T, beta, lambda0, alpha, fnorm"""
 
-        if percentile <= 0 or percentile >= 1.0:
-            raise ValueError("percentile needs to be between 0 and 1")
+        if percentile <= 0 or percentile >= 100.0:
+            raise ValueError("percentile needs to be between 0 and 100")
         if paridx < 0 or paridx > 5:
             raise ValueError("invalid parameter index %d" % paridx)
 
-        svals = self.chain[:,:,paridx].flatten()
+        svals = self.parameter_chain(paridx)
         svals.sort()
-        return svals[round((1.0 - percentile) * len(svals))]
+        return svals[round((1.0 - 0.01 * percentile) * len(svals))]
 
-    def par_uplim(self, paridx, percentile=0.683):
+    def par_uplim(self, paridx, percentile=68.3):
         """ Gets the upper limit for the parameter
 
         The parameters are in the order T, beta, lambda0, alpha, fnorm"""
 
-        if percentile <= 0 or percentile >= 1.0:
-            raise ValueError("percentile needs to be between 0 and 1")
+        if percentile <= 0 or percentile >= 100.0:
+            raise ValueError("percentile needs to be between 0 and 100")
         if paridx < 0 or paridx > 5:
             raise ValueError("invalid parameter index %d" % paridx)
 
         svals = self.chain[:,:,paridx].flatten()
         svals.sort()
-        return svals[round(percentile * len(svals))]
+        return svals[round(0.01 * percentile * len(svals))]
 
 # This is a class that does frequency integration
 # The idea is to allow this to also be multiprocessed
@@ -290,7 +311,7 @@ class modified_blackbody_fit(object):
                     prevstep = currstep
 
     def get_lir(self, redshift, maxidx=None):
-        """ Get 8-1000 micron LIR from chain in solar luminosities"""
+        """ Get 8-1000 micron LIR from chain in 10^12 solar luminosities"""
 
         try:
             import astropy.cosmology
@@ -305,7 +326,7 @@ class modified_blackbody_fit(object):
         # 4 * pi * mpc_to_cm^2/L_sun
         z = float(redshift)
         dl = astropy.cosmology.WMAP7.luminosity_distance(z) #Mpc
-        lirprefac = 3.11749657e16 * dl**2
+        lirprefac = 3.11749657e4 * dl**2 # Also converts to 10^12 lsolar
 
         # L_IR defined as between 8 and 1000 microns (rest)
         integrator = modified_blackbody_freqint(z, 8.0, 1000.0,
@@ -347,7 +368,7 @@ class modified_blackbody_fit(object):
                         prevstep = currstep
 
     def get_lagn(self, redshift, maxidx=None):
-        """Get 42.5-112.5 micron luminosity from chain in solar luminosites"""
+        """Get 42.5-112.5 micron luminosity from chain in 10^12 solar luminosites"""
 
         try:
             import astropy.cosmology
@@ -364,7 +385,7 @@ class modified_blackbody_fit(object):
         # 4*pi*dl^2/L_sun in cgs -- so the output will be in 
         # solar luminosities; the prefactor is
         # 4 * pi * mpc_to_cm^2/L_sun
-        lagnprefac = 3.11749657e16 * dl**2
+        lagnprefac = 3.11749657e4 * dl**2
 
         # L_IR defined as between 42.5 and 122.5 microns (rest)
         integrator = modified_blackbody_freqint(z, 42.5, 122.5,
