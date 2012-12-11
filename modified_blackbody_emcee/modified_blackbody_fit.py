@@ -21,6 +21,9 @@ class modified_blackbody_results(object):
           Fit object
         """
 
+        assert type(fit) is modified_blackbody_fit, \
+            "fit is not modified_blackbody_fit"
+
         self.like = fit.like
         self.chain = fit.sampler.chain
         self.lnprobability = fit.sampler.lnprobability
@@ -63,22 +66,77 @@ class modified_blackbody_results(object):
                 self.lnprobability[idxmax[0], idxmax[1]],
                 idxmax)
 
-    def _parcen_internal(self, array, percentile):
+    def _parcen_internal(self, array, percentile, lowlim=None,
+                         uplim=None):
+        """
+        Parameters
+        ----------
+        array : ndarray
+          Input array
+
+        percentile : float
+          Percentile for computation (0-100)
+
+        lowlim : float
+          Smallest value to allow in computation
+
+        uplim : float
+          Largest value to allow in computation
+
+        Returns
+        -------
+        tup : tuple
+          Mean, upper uncertainty, lower uncertainty.
+        """
+
+        pcnt = float(percentile)
+        if pcnt < 0 or pcnt > 100:
+            raise ValueError("Invalid percentile %f" % pcnt)
+
         aint = copy.deepcopy(array)
+        
+        # Slice off ends if needed
+        if (not lowlim is None) or (not uplim is None):
+            if lowlim is None:
+                cond = (aint <= float(uplim)).nonzero()[0]
+            elif uplim is None:
+                cond = (aint >= float(lowlim)).nonzero()[0]
+            else:
+                cond = ((aint >= float(lowlim)) and (aint <= float(uplim))).nonzero()[0]
+            if len(cond) == 0:
+                raise Exception("No elements survive lower/upper limit clipping")
+            if len(cond) != len(aint):
+                aint = aint[cond]
+
         aint.sort()
         mnval = numpy.mean(aint)
-        pval = (1.0-percentile)/2
-        lowval = aint[round(pval * len(aint))]
-        upval  = aint[round((1.0 - pval) * len(aint))]
+        pval = (1.0 - 0.01 * pcnt)/2
+        na = len(aint)
+        lowidx = round(pval * na)
+        assert lowidx > 0 and lowidx < na, \
+            "Invalid lower index %d for pval %f percentile %f" %\
+            (lowidx, pval, pcnt)
+        lowval = aint[lowidx]
+        upidx = round((1.0 - pval) * na)
+        assert upidx > 0 and upidx < na, \
+            "Invalid upper index %d for pval %f percentile %f" %\
+            (upidx, pval, pcnt)
+        upval  = aint[upidx]
         return (mnval, upval-mnval, mnval-lowval)
     
-    def peaklambda_cen(self, percentile=68.3):
+    def peaklambda_cen(self, percentile=68.3, lowlim=None, uplim=None):
         """ Gets the central confidence interval for the peak lambda.
 
         Parameters
         ----------
         percentile : float
           The percentile to use when computing the uncertainties.
+
+        lowlim : float
+          Smallest value to allow in computation
+
+        uplim : float
+          Largest value to allow in computation
 
         Returns
         -------
@@ -87,21 +145,29 @@ class modified_blackbody_results(object):
           and lower uncertainty of the peak observer frame
           wavelength in microns.
         """
+
         if not hasattr(self, 'peaklambda'): return None
-        return self._parcen_internal(self.peaklambda.flatten(), percentile)
+        return self._parcen_internal(self.peaklambda.flatten(), percentile,
+                                     lowlim=lowlim, uplim=uplim)
 
     @property
     def lir_chain(self):
         if not hasattr(self, 'lir'): return None
         return self.lir.flatten()
 
-    def lir_cen(self, percentile=68.3):
+    def lir_cen(self, percentile=68.3, lowlim=None, uplim=None):
         """ Gets the central confidence interval for L_IR.
 
         Parameters
         ----------
         percentile : float
           The percentile to use when computing the uncertainties.
+
+        lowlim : float
+          Smallest value to allow in computation
+
+        uplim : float
+          Largest value to allow in computation
 
         Returns
         -------
@@ -110,21 +176,29 @@ class modified_blackbody_results(object):
           and lower uncertainty of the IR luminosity (8-1000um)
           in 10^12 solar luminosities.
         """
+
         if not hasattr(self, 'lir'): return None
-        return self._parcen_internal(self.lir.flatten(), percentile)
+        return self._parcen_internal(self.lir.flatten(), percentile,
+                                     lowlim=lowlim, uplim=uplim)
 
     @property
     def lagn_chain(self):
         if not hasattr(self, 'lagn'): return None
         return self.lagn.flatten()
 
-    def lagn_cen(self, percentile=68.3):
+    def lagn_cen(self, percentile=68.3, lowlim=None, uplim=None):
         """ Gets the central confidence interval for L_AGN
 
         Parameters
         ----------
         percentile : float
           The percentile to use when computing the uncertainties.
+
+        lowlim : float
+          Smallest value to allow in computation
+
+        uplim : float
+          Largest value to allow in computation
 
         Returns
         -------
@@ -135,20 +209,27 @@ class modified_blackbody_results(object):
         """
 
         if not hasattr(self, 'lagn'): return None
-        return self._parcen_internal(self.lagn.flatten(), percentile)
+        return self._parcen_internal(self.lagn.flatten(), percentile,
+                                     lowlim=lowlim, uplim=uplim)
 
     @property
     def dustmass_chain(self):
         if not hasattr(self, 'dustmass'): return None
         return self.dustmass.flatten()
 
-    def dustmass_cen(self, percentile=68.3):
+    def dustmass_cen(self, percentile=68.3, lowlim=None, uplim=None):
         """ Gets the central confidence interval for dustmass.
 
         Parameters
         ----------
         percentile : float
           The percentile to use when computing the uncertainties.
+
+        lowlim : float
+          Smallest value to allow in computation
+
+        uplim : float
+          Largest value to allow in computation
 
         Returns
         -------
@@ -158,7 +239,8 @@ class modified_blackbody_results(object):
         """
 
         if not hasattr(self, 'dustmass'): return None
-        return self._parcen_internal(self.dustmass.flatten(), percentile)
+        return self._parcen_internal(self.dustmass.flatten(), percentile,
+                                     lowlim=lowlim, uplim=uplim)
 
     def parameter_chain(self, paridx):
         """ Gets flattened chain for parameter number"""
@@ -166,7 +248,7 @@ class modified_blackbody_results(object):
             raise ValueError("invalid parameter index %d" % paridx)
         return self.chain[:,:,paridx].flatten()
 
-    def par_cen(self, paridx, percentile=68.3):
+    def par_cen(self, paridx, percentile=68.3, lowlim=None, uplim=None):
         """ Gets the central confidence interval for the parameter
 
         The parameters are in the order T, beta, lambda0, alpha, fnorm"""
@@ -177,7 +259,7 @@ class modified_blackbody_results(object):
             raise ValueError("invalid parameter index %d" % paridx)
 
         return self._parcen_internal(self.parameter_chain(paridx), 
-                                     percentile*0.01)
+                                     percentile, lowlim=lowlim, uplim=uplim)
 
     def par_lowlim(self, paridx, percentile=68.3):
         """ Gets the lower limit for the parameter
@@ -211,8 +293,9 @@ class modified_blackbody_results(object):
         """ Print out the parameter central values"""
         idx = [0,1,4]
         tag = ["T/(1+z)","beta","fnorm"]
+        units = ["[K]","","[mJy]"]
         retstr = ""
-        for i,tg in zip(idx, tag):
+        for i,tg, unit in zip(idx, tag, units):
             retstr += "%s: " % tg
             if self.like._fixed[i]:
                 retstr += "%0.2f (fixed)\n" % self.chain[:,:,i].mean()
@@ -225,13 +308,15 @@ class modified_blackbody_results(object):
                 tup = (self.like._gprior_mean[i], 
                        1.0/math.sqrt(self.like._gprior_ivar[i]))
                 retstr += " prior: %0.2f %0.2f" % tup
-            retstr += ")\n"
+            retstr += ") %s\n" % unit
 
         if not self.like._opthin:
             if self.like._fixed[2]:
-                retstr += "lambda0 (1+z): %0.2f (fixed)\n" % self.chain[:,:,2].mean()
+                retstr += "lambda0 (1+z): %0.2f (fixed) [um]\n" %\
+                    self.chain[:,:,2].mean()
             else:
-                retstr += "lambda0 (1+z): %0.2f +%0.2f -%0.2f" % self.par_central_values[2]
+                retstr += "lambda0 (1+z): %0.2f +%0.2f -%0.2f" %\
+                    self.par_central_values[2]
                 retstr += " (low lim: %0.2f" % self.like._lowlim[2]
                 if self.like._has_uplim[2]:
                     retstr += " upper lim: %0.2f" % self.like._uplim[2]
@@ -239,7 +324,7 @@ class modified_blackbody_results(object):
                     tup = (self.like._gprior_mean[2],
                            1.0/math.sqrt(self.like._gprior_ivar[2]))
                     retstr += " prior: %0.2f %0.2f" % tup
-                retstr += ")\n"
+                retstr += ") [um]\n"
         else:
             retstr += "Optically thin case assumed\n"
 
@@ -258,14 +343,19 @@ class modified_blackbody_results(object):
                 retstr += ")\n"
         else:
             retstr += "Alpha not used\n"
+
         if hasattr(self,'lir_central_value'):
-            retstr += "L_IR: %0.2f +%0.2f -%0.2f" % self.lir_central_value
+            retstr += "L_IR: %0.2f +%0.2f -%0.2f [10^12 Lsun]\n" % \
+                self.lir_central_value
         if hasattr(self,'lagn_central_value'):
-            retstr += "L_AGN: %0.2f +%0.2f -%0.2f" % self.lagn_central_value
+            retstr += "L_AGN: %0.2f +%0.2f -%0.2f [10^12 Lsun]\n" % \
+                self.lagn_central_value
         if hasattr(self,'dustmass_central_value'):
-            retstr += "M_dust: %0.2f +%0.2f -%0.2f" % self.dustmass_central_value
+            retstr += "M_dust: %0.2f +%0.2f -%0.2f [10^8 Msun]\n" % \
+                self.dustmass_central_value
         if hasattr(self,'peaklambda_central_value'):
-            retstr += "lambda_peak: %0.2f +%0.2f -%0.2f" % self.peaklambda_central_value
+            retstr += "lambda_peak: %0.2f +%0.2f -%0.2f [um]\n" % \
+                self.peaklambda_central_value
             
         return retstr
 
@@ -456,6 +546,8 @@ class modified_blackbody_fit(object):
         # solar luminosities; the prefactor is
         # 4 * pi * mpc_to_cm^2/L_sun
         z = float(redshift)
+        if z <= 0:
+            raise ValueError("Redshift is not positive: %f" % z)
         dl = astropy.cosmology.WMAP7.luminosity_distance(z) #Mpc
         lirprefac = 3.11749657e4 * dl**2 # Also converts to 10^12 lsolar
 
@@ -511,6 +603,8 @@ class modified_blackbody_fit(object):
 
         # Get luminosity distance in cm for correction
         z = float(redshift)
+        if z <= 0:
+            raise ValueError("Redshift is not positive: %f" % z)
         dl = astropy.cosmology.WMAP7.luminosity_distance(z)
 
         # 4*pi*dl^2/L_sun in cgs -- so the output will be in 
@@ -590,6 +684,8 @@ class modified_blackbody_fit(object):
 
         # Get luminosity distance
         z = float(redshift)
+        if z <= 0:
+            raise ValueError("Redshift is not positive: %f" % z)
         mpc_to_cm = 3.08567758e24
         dl = astropy.cosmology.WMAP7.luminosity_distance(z) * mpc_to_cm
         dl2 = dl**2
