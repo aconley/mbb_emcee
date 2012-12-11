@@ -95,7 +95,7 @@ if __name__ == "__main__":
     parser.add_argument("--lowT",action='store',type=float,default=None,
                         help="Lower limit on T (Def:0)")
     parser.add_argument("--lowBeta",action='store',type=float,default=None,
-                        help="Lower limit on beta (Def:0)")
+                        help="Lower limit on beta (Def:0.1)")
     parser.add_argument("--lowLambda0",action='store',type=float,default=None,
                         help="Lower limit on lambda0 (Def:0)")
     parser.add_argument("--lowAlpha",action='store',type=float,default=None,

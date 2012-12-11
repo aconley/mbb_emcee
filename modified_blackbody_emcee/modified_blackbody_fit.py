@@ -14,32 +14,48 @@ __all__ = ["modified_blackbody_fit", "modified_blackbody_results"]
 class modified_blackbody_results(object):
     """Holds results of fit"""
     def __init__(self, fit):
-        """Takes a modified_blackbody_fit object"""
+        """
+        Parameters
+        ----------
+        fit : modified_blackbody_fit
+          Fit object
+        """
+
         self.like = fit.like
         self.chain = fit.sampler.chain
         self.lnprobability = fit.sampler.lnprobability
+
+        self.par_central_values = [self.par_cen(i) for i in range(5)]
+
         try:
             self.lir = fit.lir
+            self.lir_central_value = self.lir_cen()
         except AttributeError:
             pass
         try:
             self.lagn = fit.lagn
+            self.lagn_central_value = self.lagn_cen()
         except AttributeError:
             pass
         try:
             self.dustmass = fit.dustmass
+            self.dustmass_central_value = self.dustmass_cen()
         except AttributeError:
             pass
         try:
             self.peaklambda = fit.peaklambda
+            self.peaklambda_central_value = self.peaklambda_cen()
         except AttributeError:
             pass
 
     def best_fit(self):
         """ Finds the best fitting point that occurred during the fit
 
-        Returns a tuple of the parameters, the log probability, and the
-        index into lnprobability"""
+        Returns
+        -------
+        tup : tuple
+         A tuple of the parameters, the log probability, and the
+         index into lnprobability"""
 
         idxmax_flat = self.lnprobability.argmax()
         idxmax = numpy.unravel_index(idxmax_flat, self.lnprobability.shape)
@@ -57,7 +73,20 @@ class modified_blackbody_results(object):
         return (mnval, upval-mnval, mnval-lowval)
     
     def peaklambda_cen(self, percentile=68.3):
-        """ Gets the central confidence interval for the peak lambda"""
+        """ Gets the central confidence interval for the peak lambda.
+
+        Parameters
+        ----------
+        percentile : float
+          The percentile to use when computing the uncertainties.
+
+        Returns
+        -------
+        tup : tuple
+          A tuple of the central value, upper uncertainty, 
+          and lower uncertainty of the peak observer frame
+          wavelength in microns.
+        """
         if not hasattr(self, 'peaklambda'): return None
         return self._parcen_internal(self.peaklambda.flatten(), percentile)
 
@@ -67,7 +96,20 @@ class modified_blackbody_results(object):
         return self.lir.flatten()
 
     def lir_cen(self, percentile=68.3):
-        """ Gets the central confidence interval for L_IR"""
+        """ Gets the central confidence interval for L_IR.
+
+        Parameters
+        ----------
+        percentile : float
+          The percentile to use when computing the uncertainties.
+
+        Returns
+        -------
+        tup : tuple
+          A tuple of the central value, upper uncertainty, 
+          and lower uncertainty of the IR luminosity (8-1000um)
+          in 10^12 solar luminosities.
+        """
         if not hasattr(self, 'lir'): return None
         return self._parcen_internal(self.lir.flatten(), percentile)
 
@@ -77,7 +119,21 @@ class modified_blackbody_results(object):
         return self.lagn.flatten()
 
     def lagn_cen(self, percentile=68.3):
-        """ Gets the central confidence interval for L_AGN"""
+        """ Gets the central confidence interval for L_AGN
+
+        Parameters
+        ----------
+        percentile : float
+          The percentile to use when computing the uncertainties.
+
+        Returns
+        -------
+        tup : tuple
+          A tuple of the central value, upper uncertainty, 
+          and lower uncertainty of the luminosity from 42.5-122.5um
+          in 10^12 solar luminosities.
+        """
+
         if not hasattr(self, 'lagn'): return None
         return self._parcen_internal(self.lagn.flatten(), percentile)
 
@@ -87,11 +143,24 @@ class modified_blackbody_results(object):
         return self.dustmass.flatten()
 
     def dustmass_cen(self, percentile=68.3):
-        """ Gets the central confidence interval for dustmass"""
+        """ Gets the central confidence interval for dustmass.
+
+        Parameters
+        ----------
+        percentile : float
+          The percentile to use when computing the uncertainties.
+
+        Returns
+        -------
+        tup : tuple
+          A tuple of the central value, upper uncertainty, 
+          and lower uncertainty of the dust mass in 10^8 solar masses.
+        """
+
         if not hasattr(self, 'dustmass'): return None
         return self._parcen_internal(self.dustmass.flatten(), percentile)
 
-    def parameter_chain(self, pardix):
+    def parameter_chain(self, paridx):
         """ Gets flattened chain for parameter number"""
         if paridx < 0 or paridx > 5:
             raise ValueError("invalid parameter index %d" % paridx)
@@ -137,6 +206,68 @@ class modified_blackbody_results(object):
         svals = self.chain[:,:,paridx].flatten()
         svals.sort()
         return svals[round(0.01 * percentile * len(svals))]
+
+    def __repr__(self):
+        """ Print out the parameter central values"""
+        idx = [0,1,4]
+        tag = ["T/(1+z)","beta","fnorm"]
+        retstr = ""
+        for i,tg in zip(idx, tag):
+            retstr += "%s: " % tg
+            if self.like._fixed[i]:
+                retstr += "%0.2f (fixed)\n" % self.chain[:,:,i].mean()
+            else:
+                retstr += "%0.2f +%0.2f -%0.2f" % self.par_central_values[i]
+                retstr += " (low lim: %0.2f" % self.like._lowlim[i]
+            if self.like._has_uplim[i]:
+                retstr += " upper lim: %0.2f" % self.like._uplim[i]
+            if self.like._has_gprior[i]:
+                tup = (self.like._gprior_mean[i], 
+                       1.0/math.sqrt(self.like._gprior_ivar[i]))
+                retstr += " prior: %0.2f %0.2f" % tup
+            retstr += ")\n"
+
+        if not self.like._opthin:
+            if self.like._fixed[2]:
+                retstr += "lambda0 (1+z): %0.2f (fixed)\n" % self.chain[:,:,2].mean()
+            else:
+                retstr += "lambda0 (1+z): %0.2f +%0.2f -%0.2f" % self.par_central_values[2]
+                retstr += " (low lim: %0.2f" % self.like._lowlim[2]
+                if self.like._has_uplim[2]:
+                    retstr += " upper lim: %0.2f" % self.like._uplim[2]
+                if self.like._has_gprior[2]:
+                    tup = (self.like._gprior_mean[2],
+                           1.0/math.sqrt(self.like._gprior_ivar[2]))
+                    retstr += " prior: %0.2f %0.2f" % tup
+                retstr += ")\n"
+        else:
+            retstr += "Optically thin case assumed\n"
+
+        if not self.like._noalpha:
+            if self.like._fixed[3]:
+                retstr += "alpha: %0.2f (fixed)\n" % self.chain[:,:,3].mean()
+            else:
+                retstr += "alpha: %0.2f +%0.2f -%0.2f" % self.par_central_values[3]
+                retstr += " (low lim: %0.2f" % self.like._lowlim[3]
+                if self.like._has_uplim[3]:
+                    retstr += " upper lim: %0.2f" % self.like._uplim[3]
+                if self.like._has_gprior[3]:
+                    tup = (self.like._gprior_mean[3],
+                           1.0/math.sqrt(self.like._gprior_ivar[3]))
+                    retstr += " prior: %0.2f %0.2f" % tup
+                retstr += ")\n"
+        else:
+            retstr += "Alpha not used\n"
+        if hasattr(self,'lir_central_value'):
+            retstr += "L_IR: %0.2f +%0.2f -%0.2f" % self.lir_central_value
+        if hasattr(self,'lagn_central_value'):
+            retstr += "L_AGN: %0.2f +%0.2f -%0.2f" % self.lagn_central_value
+        if hasattr(self,'dustmass_central_value'):
+            retstr += "M_dust: %0.2f +%0.2f -%0.2f" % self.dustmass_central_value
+        if hasattr(self,'peaklambda_central_value'):
+            retstr += "lambda_peak: %0.2f +%0.2f -%0.2f" % self.peaklambda_central_value
+            
+        return retstr
 
 # This is a class that does frequency integration
 # The idea is to allow this to also be multiprocessed

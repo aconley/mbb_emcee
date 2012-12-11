@@ -26,7 +26,7 @@ class likelihood(object) :
         # for T, which shouldn't get too small or odd things happen
         # Keep in mind the minimum Temperature should be Tcmb*(1+z)
         # so as long as we stay above that
-        self._lowlim = np.array([1, 1e-3, 1, 1e-3, 1e-3])
+        self._lowlim = np.array([1, 0.1, 1, 0.1, 1e-3])
 
         # Setup upper limits; note that alpha and beta have
         # upper limits by default
