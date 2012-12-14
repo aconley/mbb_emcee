@@ -1,4 +1,4 @@
-modified_blackbody_emcee
+mbb_emcee
 ========================
 
 This is a package to fit modified blackbodies to photometry
@@ -10,10 +10,10 @@ The usual
 
 ###Usage
 The command line routine is
-	run_blackbody_emcee.py
+	run_mbb_emcee.py
 
 Help can be obtained via
-	modified_blackbody_emcee.py --help
+	mbb_emcee.py --help
 
 This produces a pickled save file containing the results.
 You can obtain parameter ranges and limits by reading

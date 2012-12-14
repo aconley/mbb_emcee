@@ -6,23 +6,23 @@ from modified_blackbody import modified_blackbody
 from likelihood import likelihood
 import copy
 
-__all__ = ["modified_blackbody_fit", "modified_blackbody_results"]
+__all__ = ["mbb_fit", "mbb_fit_results"]
 
 # This class holds the results.  Why don't we just save the
 # fit class?  Because it can involve a multiprocessing pool,
-# which can't be pickled
-class modified_blackbody_results(object):
+# which can't be pickled.  So instead we package the results up
+# in this, which also has methods for finding central limits, etc.
+class mbb_fit_results(object):
     """Holds results of fit"""
     def __init__(self, fit):
         """
         Parameters
         ----------
-        fit : modified_blackbody_fit
+        fit : mbb_fit
           Fit object
         """
 
-        assert type(fit) is modified_blackbody_fit, \
-            "fit is not modified_blackbody_fit"
+        assert type(fit) is mbb_fit, "fit is not mbb_fit"
 
         self.like = fit.like
         self.chain = fit.sampler.chain
@@ -102,7 +102,8 @@ class modified_blackbody_results(object):
             elif uplim is None:
                 cond = (aint >= float(lowlim)).nonzero()[0]
             else:
-                cond = ((aint >= float(lowlim)) and (aint <= float(uplim))).nonzero()[0]
+                cond = numpy.all(aint >= float(lowlim),
+                                 aint <= float(uplim)).nonzero()[0]
             if len(cond) == 0:
                 raise Exception("No elements survive lower/upper limit clipping")
             if len(cond) != len(aint):
@@ -110,14 +111,14 @@ class modified_blackbody_results(object):
 
         aint.sort()
         mnval = numpy.mean(aint)
-        pval = (1.0 - 0.01 * pcnt)/2
+        pval = (1.0 - 0.01 * pcnt) / 2
         na = len(aint)
-        lowidx = round(pval * na)
+        lowidx = int(round(pval * na))
         assert lowidx > 0 and lowidx < na, \
             "Invalid lower index %d for pval %f percentile %f" %\
             (lowidx, pval, pcnt)
         lowval = aint[lowidx]
-        upidx = round((1.0 - pval) * na)
+        upidx = int(round((1.0 - pval) * na))
         assert upidx > 0 and upidx < na, \
             "Invalid upper index %d for pval %f percentile %f" %\
             (upidx, pval, pcnt)
@@ -359,9 +360,8 @@ class modified_blackbody_results(object):
             
         return retstr
 
-# This is a class that does frequency integration
 # The idea is to allow this to also be multiprocessed
-class modified_blackbody_freqint(object):
+class mbb_freqint(object):
     """ Does frequency integration"""
     
     def __init__(self, redshift, lammin, lammax, opthin=False,
@@ -412,8 +412,8 @@ class modified_blackbody_freqint(object):
                                  noalpha=self._noalpha)
         return mbb.freq_integrate(self._minwave_obs, self._maxwave_obs)
 
-# Set up class to do fit
-class modified_blackbody_fit(object):
+
+class mbb_fit(object):
     """ Does fit"""
 
     def __init__(self, photfile, covfile, covextn, wavenorm, noalpha, 
@@ -552,9 +552,8 @@ class modified_blackbody_fit(object):
         lirprefac = 3.11749657e4 * dl**2 # Also converts to 10^12 lsolar
 
         # L_IR defined as between 8 and 1000 microns (rest)
-        integrator = modified_blackbody_freqint(z, 8.0, 1000.0,
-                                                opthin=self._opthin,
-                                                noalpha=self._noalpha)
+        integrator = mbb_freqint(z, 8.0, 1000.0, opthin=self._opthin,
+                                 noalpha=self._noalpha)
 
         # Now we compute L_IR for every step taken.
         # Two cases: using multiprocessing, and serially.
@@ -591,7 +590,8 @@ class modified_blackbody_fit(object):
                         prevstep = currstep
 
     def get_lagn(self, redshift, maxidx=None):
-        """Get 42.5-112.5 micron luminosity from chain in 10^12 solar luminosites"""
+        """Get 42.5-112.5 micron luminosity from chain in 10^12 solar 
+        luminosites"""
 
         try:
             import astropy.cosmology
@@ -613,9 +613,9 @@ class modified_blackbody_fit(object):
         lagnprefac = 3.11749657e4 * dl**2
 
         # L_IR defined as between 42.5 and 122.5 microns (rest)
-        integrator = modified_blackbody_freqint(z, 42.5, 122.5,
-                                                opthin=self._opthin,
-                                                noalpha=self._noalpha)
+        integrator = mbb_freqint(z, 42.5, 122.5, opthin=self._opthin,
+                                 noalpha=self._noalpha)
+
         # Now we compute L_AGN for every step taken.
         # Two cases: using multiprocessing, and serially.
         if self._nthreads > 1:
@@ -674,6 +674,7 @@ class modified_blackbody_fit(object):
         # This one is not parallelized because the calculation
         # is relatively trivial
         """Get dust mass in 10^8 M_sun from chain"""
+
         try:
             import astropy.cosmology
         except ImportError:

@@ -6,8 +6,7 @@ This works in the observer frame."""
 #Requires that numpy, scipy, emcee, asciitable, pyfits are installed
 
 import numpy
-from modified_blackbody_emcee import modified_blackbody_fit
-from modified_blackbody_emcee import modified_blackbody_results
+from mbb_emcee import mbb_fit, mbb_results
 
 if __name__ == "__main__":
     import argparse
@@ -171,10 +170,9 @@ if __name__ == "__main__":
     if (nwalkers <= 0) :
         raise ValueError("Invalid (non-positive) nwalkers: %d" % nwalkers)
 
-    fit = modified_blackbody_fit(photfile, covfile, parse_results.covextn,
-                                 parse_results.wavenorm, parse_results.noalpha,
-                                 parse_results.opthin, nwalkers,
-                                 parse_results.threads) 
+    fit = mbb_fit(photfile, covfile, parse_results.covextn,
+                  parse_results.wavenorm, parse_results.noalpha,
+                  parse_results.opthin, nwalkers, parse_results.threads) 
     
     # Set parameters fixed/limits if present
     if parse_results.fixT: fit.like.fix_param(0)
@@ -248,11 +246,10 @@ if __name__ == "__main__":
     p0 = []
     lowarr = fit.like._lowlim
     for i in range(nwalkers):
-        pval = numpy.random.randn(npar)*p0var + p0mn
+        pval = numpy.random.randn(npar) * p0var + p0mn
         badidx = pval < lowarr
         pval[badidx] = lowarr[badidx]
         p0.append(pval)
-
 
     # Do fit
     fit.run(parse_results.burn, parse_results.nsteps, p0, parse_results.verbose)
@@ -288,5 +285,5 @@ if __name__ == "__main__":
     # Jam parse_results into a output struct, and save that
     if parse_results.verbose : print "Saving results"
     with open(parse_results.outfile,'wb') as fl:
-        res = modified_blackbody_results(fit)
+        res = mbb_results(fit)
         pickle.dump(res, fl)

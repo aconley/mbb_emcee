@@ -9,12 +9,12 @@ if (major == 3):
     raise SystemExit("modified_blackbody_emcee does not support Python 3")
 
 setup(
-    name="modified_blackbody_emcee",
-    version="1.0.1",
+    name="mbb_emcee",
+    version="1.1.0",
     author="Alexander Conley",
     author_email="alexander.conley@colorado.edu",
-    packages=["modified_blackbody_emcee"],
-    scripts=["modified_blackbody_emcee/run_blackbody_emcee.py"],
+    packages=["mbb_emcee"],
+    scripts=["mbb_emcee/run_mbb_emcee.py"],
     license="GPL",
     description="Modified blackbody fitting using MCMC",
     classifiers=[
