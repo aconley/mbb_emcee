@@ -13,7 +13,7 @@ The command line routine is
 	run_mbb_emcee.py
 
 Help can be obtained via
-	mbb_emcee.py --help
+	run_mbb_emcee.py --help
 
 This produces a pickled save file containing the results.
 You can obtain parameter ranges and limits by reading
