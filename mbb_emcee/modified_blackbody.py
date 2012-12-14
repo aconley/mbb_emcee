@@ -246,8 +246,15 @@ class modified_blackbody(object):
             return self._hcokt / self._xmerge
 
     def __repr__(self):
-        retstr = "T: %.4g beta: %.4g lambda0: %.4g alpha: %.4g fnorm: %.4g"
-        retstr += " noalpha: %s opthin: %s"
+        retstr = "modified_blackbody(%.2g, %.2g,%.2g, %.2g, %.2g,"+\
+            "noalpha=%s, opthin=%s)"
+        return retstr % (self._T, self._beta, self._lambda0, self._alpha,
+                         self._fnorm, not self._hasalpha, self._opthin)
+
+
+    def __str__(self):
+        retstr = "modified blackbody(T: %.2g beta: %.2g lambda0: %.2g "+\
+            "alpha: %.2g fnorm: %.2g noalpha: %s opthin: %s)"
         return retstr % (self._T, self._beta, self._lambda0, self._alpha,
                          self._fnorm, not self._hasalpha, self._opthin)
 

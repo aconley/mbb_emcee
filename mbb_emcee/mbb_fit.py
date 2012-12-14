@@ -102,8 +102,8 @@ class mbb_fit_results(object):
             elif uplim is None:
                 cond = (aint >= float(lowlim)).nonzero()[0]
             else:
-                cond = numpy.all(aint >= float(lowlim),
-                                 aint <= float(uplim)).nonzero()[0]
+                cond = numpy.logical_and(aint >= float(lowlim),
+                                         aint <= float(uplim)).nonzero()[0]
             if len(cond) == 0:
                 raise Exception("No elements survive lower/upper limit clipping")
             if len(cond) != len(aint):
@@ -290,7 +290,7 @@ class mbb_fit_results(object):
         svals.sort()
         return svals[round(0.01 * percentile * len(svals))]
 
-    def __repr__(self):
+    def __str__(self):
         """ Print out the parameter central values"""
         idx = [0,1,4]
         tag = ["T/(1+z)","beta","fnorm"]
@@ -416,11 +416,16 @@ class mbb_freqint(object):
 class mbb_fit(object):
     """ Does fit"""
 
-    def __init__(self, photfile, covfile, covextn, wavenorm, noalpha, 
-                 opthin, nwalkers, nthreads):
+    def __init__(self, nwalkers=250, photfile=None, covfile=None, 
+                 covextn=None, wavenorm=500.0, noalpha=False, 
+                 opthin=False, nthreads=1):
         """
         Parameters
-        __________
+        ----------
+
+        nwalkers : integer
+           Number of MCMC walkers to use in fit
+
         photfile : string
            Text file containing photometry
         
@@ -439,9 +444,6 @@ class mbb_fit(object):
         opthin : bool
            Assume optically thin
 
-        nwalkers : integer
-           Number of MCMC walkers to use in fit
-
         nthreads : integer
            Number of threads to use
         """
@@ -450,15 +452,42 @@ class mbb_fit(object):
         self._opthin = opthin
         self._wavenorm = float(wavenorm)
         self._nthreads = int(nthreads)
-        self.like = likelihood(photfile, covfile=covfile, covextn=covextn, 
-                               wavenorm=wavenorm, noalpha=noalpha, 
-                               opthin=opthin)
+        self.like = likelihood(photfile=photfile, covfile=covfile, 
+                               covextn=covextn, wavenorm=wavenorm, 
+                               noalpha=noalpha, opthin=opthin)
         self.sampler = emcee.EnsembleSampler(nwalkers, 5, self.like,
                                              threads=self._nthreads)
         self._sampled = False
 
+    def read_data(self, photfile, covfile=None, covextn=0):
+        """ Read in photometry data from files
+
+        photfile : string
+           Text file containing photometry
+        
+        covfile : string
+           FITS file containing covariance matrix. None for no file
+
+        covextn : integer
+           Extension of covaraince file
+        """
+
+        self.like.read_phot(photfile)
+        if not covfile is None:
+            self.like.read_cov(covfile, extn=covextn)
+
+    def set_data(self, wave, flux, flux_unc, covmatrix=None):
+        """ Set photometry and covariance matrix"""
+        self.like.set_phot(wave, flux, flux_unc)
+        if not covmatrix is None:
+            self.like.set_cov(covmatrix)
+
     def run(self, nburn, nsteps, p0, verbose=False):
         """Do emcee run"""
+
+        # Make sure we have data
+        if not self.like.data_read:
+            raise Exception("Data not read, needed to do fit")
 
         # Do burn in
         self.sampler.reset()

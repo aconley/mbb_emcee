@@ -5,14 +5,44 @@ import astropy.cosmology
 
 __all__ = ["likelihood"]
 
+""" Parameter order dictionary"""
+param_order = {'t': 0, 't/(1+z)': 0, 'beta': 1, 'lambda0': 2,
+                'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
+                'alpha': 3, 'fnorm': 4}
+
 """Class holding data, defining likelihood"""
 class likelihood(object) :
-    def __init__(self, photfile, covfile=None, covextn=0, 
+
+    """ Parameter order dictionary.  Lowercased."""
+    _param_order = {'t': 0, 't/(1+z)': 0, 'beta': 1, 'lambda0': 2,
+                    'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
+                    'alpha': 3, 'fnorm': 4}
+
+    def __init__(self, photfile=None, covfile=None, covextn=0, 
                  wavenorm=500.0, noalpha=False, opthin=False) :
-        """Photfile is the name of the photometry file, covfile the name
-        of a fits file holding the covariance matrix (if present), which
-        is in extension covextn.  The wavelength normalizing the SED is
-        wavenorm (in microns)."""
+        """ Object for computing likelihood of a given set of parameters.
+
+        Parameters
+        ----------
+        photfile : string
+           Text file containing photometry
+        
+        covfile : string
+           FITS file containing covariance matrix. None for no file
+
+        covextn : integer
+           Extension of covaraince file
+
+        wavenorm : float
+           Wavelength of normalization in microns
+
+        noalpha : bool
+           Ignore alpha in fit
+
+        opthin : bool
+           Assume optically thin
+        """
+
         self._wavenorm = float(wavenorm)
         self._noalpha = bool(noalpha)
         self._opthin = bool(opthin)
@@ -41,18 +71,46 @@ class likelihood(object) :
         self._gprior_ivar = np.ones(5)
 
         # Data
-        self.read_phot(photfile)
-        if not covfile is None :
-            if not isinstance(covfile, basestring):
-                raise TypeError("covfile must be string-like")
-            self.read_cov(covfile, extn=covextn)
+        if not photfile is None:
+            self.read_phot(photfile)
+            if not covfile is None :
+                if not isinstance(covfile, basestring):
+                    raise TypeError("covfile must be string-like")
+                self.read_cov(covfile, extn=covextn)
         else:
+            if not covfile is None:
+                raise Exception("Can't pass in covfile if no photfile")
+            self._data_read = False
             self._has_covmatrix = False
 
         # Reset normalization flux lower limit based on data
         self._lowlim[4] = 1e-3 * self._flux.min()
 
         self._badval = float("-inf")
+
+    def set_phot(self, wave, flux, flux_unc):
+        """ Sets photometry"""
+        self._wave = np.asarray(wave)
+        self._ndata = len(self._wave) 
+        if self._ndata == 0:
+            raise ValueError("No elements in wavelength vector")
+
+        self._flux = np.asarray(flux)
+        self._flux_unc = np.asarray(flux_unc)
+        if len(self._wave) != len(self._flux):
+            raise ValueError("wave not same length as flux")
+        if len(self._wave) != len(self._flux_unc):
+            raise ValueError("wave not same length as flux_unc")
+        self._ivar = 1.0 / self._flux_unc**2
+
+        # Set upper limit on lambda0 -- if its 5x above
+        #  our longest wavelength point, we can't say anything
+        #  about it.
+        if not self._has_uplim[2]:
+            self._has_uplim[2] = True
+            self._uplim[2] = 5.0 * self._wave.max()
+
+        self._data_read = True
 
     def read_phot(self, filename) :
         """Reads in the photometry file, storing the wave [um],
@@ -64,55 +122,70 @@ class likelihood(object) :
         if len(data) == 0 :
             errstr = "No data read from %s" % filename
             raise IOError(errstr)
-        self._wave = np.array([dat[0] for dat in data])
-        self._flux = np.array([dat[1] for dat in data])
-        self._flux_unc = np.array([dat[2] for dat in data])
-        self._ivar = 1.0/self._flux_unc**2
-        self._ndata = len(self._wave) 
+        self.set_phot([dat[0] for dat in data],[dat[1] for dat in data],
+                      [dat[2] for dat in data])
 
-        # Set upper limit on lambda0 -- if its 5x above
-        #  our longest wavelength point, we can't say anything
-        #  about it.
-        if not self._has_uplim[2]:
-            self._has_uplim[2] = True
-            self._uplim[2] = 5.0 * self._wave.max()
+    @property
+    def data_read(self):
+        return self._data_read
+
+    @property
+    def ndata(self):
+        if self._data_read:
+            return self._ndata
+        else:
+            return None
 
     @property 
     def data_wave(self):
-        if hasattr(self, '_wave'):
+        if self._data_read:
             return self._wave
         else:
             return None
 
     @property 
     def data_flux(self):
-        if hasattr(self, '_flux'):
+        if self._data_read:
             return self._flux
         else:
             return None
 
     @property 
     def data_flux_unc(self):
-        if hasattr(self, '_flux_unc'):
+        if self._data_read:
             return self._flux_unc
         else:
             return None
+
+    def set_cov(self, covmatrix):
+        """ Sets covariance matrix"""
+
+        if not self._data_read:
+            raise Exception("Can't set covariance matrix without photometry")
+
+        if covmatrix.shape[0] != covmatrix.shape[1] :
+            raise ValueError("Covariance matrix from is not square")
+        
+        if covmatrix.shape[0] != len(self._flux) :
+            errstr = "Covariance matrix doesn't have same number of "+\
+                "datapoints as photometry"
+            raise ValueError(errstr)
+
+        self._covmatrix = covmatrix
+        self._invcovmatrix = np.linalg.inv(self._covmatrix)
+        self._has_covmatrix = True
+
 
     def read_cov(self, filename, extn=0) :
         """Reads in the covariance matrix from the specified
         extension of the input FITS file (in extension extn)"""
         import pyfits
+
+        if not self._data_read:
+            raise Exception("Can't read in covaraince matrix without phot")
+
         hdu = pyfits.open(filename)
-        self._covmatrix = hdu[extn].data
-        if self._covmatrix.shape[0] != self._covmatrix.shape[1] :
-            errstr = "Covariance matrix from %s is not square" % filename
-            raise ValueError(errstr)
-        if self._covmatrix.shape[0] != len(self._flux) :
-            errstr = "Covariance matrix doesn't have same number of "+\
-                "datapoints as photometry"
-            raise ValueError(errstr)
-        self._invcovmatrix = np.linalg.inv(self._covmatrix)
-        self._has_covmatrix = True
+        self.set_cov(hdu[extn].data)
 
     @property
     def has_data_covmatrix(self):
@@ -125,43 +198,102 @@ class likelihood(object) :
         else:
             return None
 
-    def fix_param(self, paramidx):
+    def fix_param(self, param):
         """Fixes the specified parameter.
 
-        Params are in order 'T','beta','lambda0','alpha','fnorm'
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification
         """
+        if isinstance(param, str):
+            paramidx = self._param_order[param.lower()]
+        else:
+            paramidx = int(param)
+            
         self._fixed[paramidx] = True
 
-    def unfix_param(self, paramidx):
+    def unfix_param(self, param):
         """Un-fixes the specified parameter.
+        
+        Parameters
+        ----------
 
-        Params are in order 'T','beta','lambda0','alpha','fnorm'
+        param : int or string
+          Parameter specification
         """
+        if isinstance(param, str):
+            paramidx = self._param_order[param.lower()]
+        else:
+            paramidx = int(param)
+            
         self._fixed[paramidx] = False
 
-    def set_lowlim(self, paramidx, val) :
+    def set_lowlim(self, param, val) :
         """Sets the specified parameter lower limit to value.
 
-        Params are in order 'T','beta','lambda0','alpha','fnorm'
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification
         """
-        self._lowlim[paramidx] = val
+        if isinstance(param, str):
+            self._lowlim[self._param_order[param]] = val
+        else:
+            self._lowlim[param] = val
+
+    def get_lowlim(self, param):
+        """Gets the specified parameter lower limit
+
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification
+        """
+        if isinstance(param, str):
+            paramidx = self._param_order[param.lower()]
+        else:
+            paramidx = int(param)
+            
+        return self._lowlim[paramidx]
 
     def get_lowlims(self):
         return self._lowlim
 
-    def set_uplim(self, paramidx, val) :
+    def set_uplim(self, param, val) :
         """Sets the specified parameter upper limit to value.
 
-        Params are in order 'T','beta','lambda0','alpha','fnorm'
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification
         """
+        if isinstance(param, str):
+            paramidx = self._param_order[param.lower()]
+        else:
+            paramidx = int(param)
+
         self._has_uplim[paramidx] = True
         self._uplim[paramidx] = val
 
-    def set_gaussian_prior(self, paramidx, mean, sigma):
+    def set_gaussian_prior(self, param, mean, sigma):
         """Sets up a Gaussian prior on the specified parameter.
 
-        Params are in order 'T','beta','lambda0','alpha','fnorm'
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification
         """
+
+        if isinstance(param, str):
+            paramidx = self._param_order[param.lower()]
+        else:
+            paramidx = int(param)
 
         self._any_gprior = True
         self._has_gprior[paramidx] = True
@@ -190,7 +322,7 @@ class likelihood(object) :
         return True
 
     def _uplim_prior(self,pars):
-        """Adds upper limit prior
+        """ Gets likelihood of upper limit priors
 
         For values above the upper limit, applies a Gaussian
         penalty centered at the limit with sigma = limit/100.0.

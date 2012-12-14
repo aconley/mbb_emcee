@@ -6,7 +6,7 @@ This works in the observer frame."""
 #Requires that numpy, scipy, emcee, asciitable, pyfits are installed
 
 import numpy
-from mbb_emcee import mbb_fit, mbb_results
+from mbb_emcee import mbb_fit, mbb_fit_results
 
 if __name__ == "__main__":
     import argparse
@@ -170,9 +170,12 @@ if __name__ == "__main__":
     if (nwalkers <= 0) :
         raise ValueError("Invalid (non-positive) nwalkers: %d" % nwalkers)
 
-    fit = mbb_fit(photfile, covfile, parse_results.covextn,
-                  parse_results.wavenorm, parse_results.noalpha,
-                  parse_results.opthin, nwalkers, parse_results.threads) 
+    fit = mbb_fit(nwalkers=nwalkers, photfile=photfile, covfile=covfile, 
+                  covextn=parse_results.covextn,
+                  wavenorm=parse_results.wavenorm, 
+                  noalpha=parse_results.noalpha,
+                  opthin=parse_results.opthin, 
+                  nthreads=parse_results.threads) 
     
     # Set parameters fixed/limits if present
     if parse_results.fixT: fit.like.fix_param(0)
@@ -184,27 +187,27 @@ if __name__ == "__main__":
         
     # Lower limits
     if not parse_results.lowT is None: 
-        fit.like.set_lowlim(0,parse_results.lowT)
+        fit.like.set_lowlim('T',parse_results.lowT)
     if not parse_results.lowBeta is None: 
-        fit.like.set_lowlim(1,parse_results.lowBeta)
+        fit.like.set_lowlim('beta',parse_results.lowBeta)
     if (not parse_results.opthin) and (not parse_results.lowLambda0 is None): 
-        fit.like.set_lowlim(2,parse_results.lowLambda0)
+        fit.like.set_lowlim('lambda0',parse_results.lowLambda0)
     if (not parse_results.noalpha) and (not parse_results.lowAlpha is None): 
-        fit.like.set_lowlim(3,parse_results.lowAlpha)
+        fit.like.set_lowlim('alpha',parse_results.lowAlpha)
     if not parse_results.lowFnorm is None: 
-        fit.like.set_lowlim(4,parse_results.lowFnorm)
+        fit.like.set_lowlim('fnorm',parse_results.lowFnorm)
 
     # Upper Limits
     if not parse_results.upT is None: 
-        fit.like.set_uplim(0,parse_results.upT)
+        fit.like.set_uplim('T',parse_results.upT)
     if not parse_results.upBeta is None : 
-        fit.like.set_uplim(1,parse_results.upBeta)
+        fit.like.set_uplim('beta',parse_results.upBeta)
     if (not parse_results.opthin) and (not parse_results.upLambda0 is None): 
-        fit.like.set_uplim(2,parse_results.upLambda0)
+        fit.like.set_uplim('lambda0',parse_results.upLambda0)
     if (not parse_results.noalpha) and (not parse_results.upAlpha is None): 
-        fit.like.set_uplim(3,parse_results.upAlpha)
+        fit.like.set_uplim('alpha',parse_results.upAlpha)
     if not parse_results.upFnorm is None : 
-        fit.like.set_uplim(4,parse_results.upFnorm)
+        fit.like.set_uplim('fnorm',parse_results.upFnorm)
 
     # Priors
     if not parse_results.priorT is None:
