@@ -11,7 +11,26 @@ __all__ = ["modified_blackbody"]
 
 def alpha_merge_eqn(x, alpha, beta, x0, opthin=False):
     """Equation we need the root for to merge power law to modified
-    blackbody"""
+    blackbody
+
+    Parameters
+    ----------
+    x : float
+      h nu / k T to evaluate at
+
+    alpha : float
+      blue side power law index
+
+    beta : float
+      Dust attenuation power law index
+
+    x0 : float
+      h nu_0 / k T
+
+    opthin : bool
+      Assume optically thin case
+    """
+
     try :
         # This can overflow badly
         xox0beta = (x / x0)**beta
@@ -362,7 +381,7 @@ class modified_blackbody(object):
                 return 3 * x**2 / efac - math.exp(x) * x**3 / efac**2
 
     def max_wave(self):
-        """ Attempt to find the wavelength of maximum emission
+        """ Find the wavelength of maximum emission
 
         Returns
         -------
