@@ -286,6 +286,7 @@ if __name__ == "__main__":
 
     res = mbb_fit_results(fit)
     if parse_results.verbose:
+        print "Fit results:\n"
         print res
 
     # Jam parse_results into a output struct, and save that

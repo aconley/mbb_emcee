@@ -73,9 +73,9 @@ class mbb_fit_results(object):
         Returns
         -------
         tup : tuple
-         A tuple of the parameters, the log probability, and the
-         index into lnprobability
-         """
+          A tuple of the parameters, the log probability, and the
+          index into lnprobability
+        """
 
         return self._best_fit
 
@@ -112,7 +112,8 @@ class mbb_fit_results(object):
 
     def _parcen_internal(self, array, percentile, lowlim=None,
                          uplim=None):
-        """
+        """ Internal computation of parameter central limits
+
         Parameters
         ----------
         array : ndarray
@@ -293,19 +294,23 @@ class mbb_fit_results(object):
     def parameter_chain(self, param):
         """ Gets flattened chain for parameter
 
-
         Parameters
         ----------
         param : int or string
           Parameter specification
+
+        Returns
+        -------
+        chain : ndarray
+          Flattened chain for specified parameter
         """
 
         if isinstance(param, str):
-            paridx = self._param_order[param.lower()]
+            paridx = self.like.get_paramindex[param]
         else:
             paridx = int(param)
-        if paridx < 0 or paridx > 5:
-            raise ValueError("invalid parameter index %d" % paridx)
+            if paridx < 0 or paridx > 5:
+                raise ValueError("invalid parameter index %d" % paridx)
 
         return self.chain[:,:,paridx].flatten()
 
@@ -315,91 +320,91 @@ class mbb_fit_results(object):
         Parameters
         ----------
         param : int or string
-          Parameter specification
+          Parameter specification.  Either an index into
+          the parameter list, or a string name for the 
+          parameter.
 
         percentile : float
-          Percentile of limit to compute
+          Percentile of uncertainties to use.  1 sigma is 68.3,
+          2 sigma is 95.4, etc.
 
         lowlim : float
-          Lower limit on parameter
+          Lower limit for parameter to include in computation
 
         uplim : float
-          Upper limit on parameter
-
-        Notes
-        -----
-        The parameters are in the order T, beta, lambda0, alpha, fnorm
+          Lower limit for parameter to include in computation
+          
+        Returns
+        -------
+        tup : tuple
+          A tuple of the mean value, upper confidence limit,
+          and lower confidence limit.
+          Percentile of limit to compute
         """
 
         if percentile <= 0 or percentile >= 100.0:
             raise ValueError("percentile needs to be between 0 and 100")
-        if isinstance(param, str):
-            paridx = self._param_order[param.lower()]
-        else:
-            paridx = int(param)
 
-        if paridx < 0 or paridx > 5:
-            raise ValueError("invalid parameter index %d" % paridx)
-
-        return self._parcen_internal(self.parameter_chain(paridx), 
+        return self._parcen_internal(self.parameter_chain(param), 
                                      percentile, lowlim=lowlim, uplim=uplim)
 
     def par_lowlim(self, param, percentile=68.3):
         """ Gets the lower limit for the parameter
 
-        Parameters
-        ----------
-
         param : int or string
-          Parameter specification
+          Parameter specification.  Either an index into
+          the parameter list, or a string name for the 
+          parameter.
 
         percentile : float
-          Percentile of limit to compute
+          Confidence level associated with limit.
 
-        Notes
-        -----
-        The parameters are in the order T, beta, lambda0, alpha, fnorm
+        Returns
+        -------
+        lowlim : float
+          Lower limit on parameter
         """
+
+        if isinstance(param, str):
+            paridx = self.like.get_paramindex[param.lower()]
+        else:
+            paridx = int(param)
+            if paridx < 0 or paridx > 5:
+                raise ValueError("invalid parameter index %d" % paridx)
 
         if percentile <= 0 or percentile >= 100.0:
             raise ValueError("percentile needs to be between 0 and 100")
-
-        if isinstance(param, str):
-            paridx = self._param_order[param.lower()]
-        else:
-            paridx = int(param)
-
-        if paridx < 0 or paridx > 5:
-            raise ValueError("invalid parameter index %d" % paridx)
 
         svals = self.parameter_chain(paridx)
         svals.sort()
         return svals[round((1.0 - 0.01 * percentile) * len(svals))]
 
-    def par_uplim(self, paridx, percentile=68.3):
+    def par_uplim(self, param, percentile=68.3):
         """ Gets the upper limit for the parameter
 
-        Parameters
-        ----------
-
         param : int or string
-          Parameter specification
+          Parameter specification.  Either an index into
+          the parameter list, or a string name for the 
+          parameter.
 
         percentile : float
-          Percentile of limit to compute
+          Confidence level associated with limit.
 
-        Notes
-        -----
-        The parameters are in the order T, beta, lambda0, alpha, fnorm
+        Returns
+        -------
+        uplim : float
+          Upper limit on parameter
         """
+
+        if isinstance(param, str):
+            paridx = self.like.get_paramindex[param.lower()]
+        else:
+            paridx = int(param)
+            if paridx < 0 or paridx > 5:
+                raise ValueError("invalid parameter index %d" % paridx)
 
         if percentile <= 0 or percentile >= 100.0:
             raise ValueError("percentile needs to be between 0 and 100")
-
-        if isinstance(param, str):
-            paridx = self._param_order[param.lower()]
-        else:
-            paridx = int(param)
 
         svals = self.chain[:,:,paridx].flatten()
         svals.sort()
@@ -417,11 +422,12 @@ class mbb_fit_results(object):
         return self.like.data_covmatrix
 
     def __str__(self):
-        """ Print out the parameter central values"""
+        """ String representation of results"""
         idx = [0,1,4]
         tag = ["T/(1+z)","beta","fnorm"]
         units = ["[K]","","[mJy]"]
         retstr = ""
+        
         for i,tg, unit in zip(idx, tag, units):
             retstr += "%s: " % tg
             if self.like._fixed[i]:
@@ -470,6 +476,9 @@ class mbb_fit_results(object):
                 retstr += ")\n"
         else:
             retstr += "Alpha not used\n"
+        
+        retstr += "Number of data points: %d\n" % self.like.ndata
+        retstr += "ChiSquare of best fit point: %0.2f\n" % self.best_fit_chisq
 
         if hasattr(self,'lir_central_value'):
             retstr += "L_IR: %0.2f +%0.2f -%0.2f [10^12 Lsun]\n" % \
@@ -595,6 +604,8 @@ class mbb_fit(object):
     def read_data(self, photfile, covfile=None, covextn=0):
         """ Read in photometry data from files
 
+        Parameters
+        ----------
         photfile : string
            Text file containing photometry
         
@@ -614,18 +625,17 @@ class mbb_fit(object):
 
         Parameters
         ----------
-        wave : ndarray
-          Wavelengths, in microns, of the data
+        wave : array like
+          Wavelength of data points in microns
 
-        flux : ndarray
-          Flux desnity of data, in mJy
+        flux : array like
+          Flux density of data in mJy
 
-        flux_unc : ndarray
-          Flux density uncertainties, in mJy
+        flux_unc : array like
+          Uncertainty in flux density of data in mJy
 
-        covmatrix : ndarray
-          Covariance matrix.  flux_unc is ignored if this is present.
-
+        covmatrix : array like
+          Covariance matrix of data in mJy^2
         """
 
         self.like.set_phot(wave, flux, flux_unc)
@@ -633,18 +643,19 @@ class mbb_fit(object):
             self.like.set_cov(covmatrix)
 
     def run(self, nburn, nsteps, p0, verbose=False):
-        """Do emcee run
-        
+        """Do emcee run.
+
         Parameters
         ----------
         nburn : int
-          Number of burn-in steps per walker
+          Number of burn in steps to do
 
         nsteps : int
-          Number of steps after burn in per walker
+          Number of steps to do for each walker
 
-        p0 : ndarray (nwalkers x 5)
-          Initial values of parameters
+        p0 : ndarray
+          Array of initial positions for each walker,
+          dimension nwalkers by 5.
 
         verbose : bool
           Print out informational messages during run.
@@ -865,10 +876,10 @@ class mbb_fit(object):
         return dustmass
 
     def get_dustmass(self, redshift, maxidx=None):
-        # This one is not parallelized because the calculation
-        # is relatively trivial
         """Get dust mass in 10^8 M_sun from chain"""
 
+        # This one is not parallelized because the calculation
+        # is relatively trivial
         try:
             import astropy.cosmology
         except ImportError:
