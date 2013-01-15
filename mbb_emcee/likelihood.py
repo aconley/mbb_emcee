@@ -133,10 +133,10 @@ class likelihood(object) :
           [mJy], and the uncertainty in the flux density [mJy].
         """
 
-        import asciitable
+        import astropy.io.ascii
         if not isinstance(filename, basestring):
             raise TypeError("filename must be string-like")
-        data = asciitable.read(filename,comment='^#')
+        data = astropy.io.ascii.read(filename,comment='^#')
         if len(data) == 0 :
             errstr = "No data read from %s" % filename
             raise IOError(errstr)

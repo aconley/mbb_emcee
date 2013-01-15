@@ -6,13 +6,16 @@ data using an affine invariant MCMC.
 
 ###Installation
 The usual
+
 	python setup.py install
 
 ###Usage
 The command line routine is
+
 	run_mbb_emcee.py
 
 Help can be obtained via
+
 	run_mbb_emcee.py --help
 
 This produces a pickled save file containing the results.
@@ -20,6 +23,7 @@ You can obtain parameter ranges and limits by reading
 in the results and examining them.  Note that all the
 blackbody parameters (temperature, etc.) are in the observer frame.
 If picklefile is a string holding the name of the output file:
+
 	import pickle
 	results = pickle.load(open(picklefile,'rb'))
         T_val = results.par_cen(0)
@@ -29,12 +33,10 @@ If picklefile is a string holding the name of the output file:
 
 ###Dependencies
 This depends on a number of python packages:
-* [numpy](http://http://numpy.scipy.org/)
-* [scipy](http://http://numpy.scipy.org/)
-* [pyfits](http://http://www.stsci.edu/institute/software_hardware/pyfits)
+* [numpy](http://numpy.scipy.org/)
+* [scipy](http://numpy.scipy.org/)
+* [astropy](http://www.astropy.org/)
 * And, perhaps most importantly, [emcee](http://http://danfm.ca/emcee/)
-* If you want to compute dust masses, you will also need
-  [astropy](http://www.astropy.org/)
 
 ### References
 * The affine invariant MCMC code is described in
