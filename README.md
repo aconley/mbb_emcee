@@ -26,9 +26,9 @@ If picklefile is a string holding the name of the output file:
 
 	import pickle
 	results = pickle.load(open(picklefile,'rb'))
-	T_val = results.par_cen(0)
+	T_val = results.par_cen('T')
 	print "Obs frame Temperature: {:0.2f}+{:0.2f}-{:0.2f}".format(*T_val)
-	b_val = results.par_cen(1)
+	b_val = results.par_cen('beta')
 	print "Beta: {:0.2f}+{:0.2f}-{:0.2f}".format(*b_val)
 
 ###Dependencies
