@@ -8,12 +8,20 @@ import copy
 
 __all__ = ["mbb_fit", "mbb_fit_results"]
 
-# This class holds the results.  Why don't we just save the
-# fit class?  Because it can involve a multiprocessing pool,
-# which can't be pickled.  So instead we package the results up
-# in this, which also has methods for finding central limits, etc.
+# This class holds the results.  Why not just save the
+# fit class?  Because mbb_fit (the fitting class) can involve a 
+# multiprocessing pool, which can't be pickled.  So instead 
+# package the results up in this, which also adds methods for 
+# finding central limits, the best fit point, etc., etc.
+
 class mbb_fit_results(object):
     """Holds results of fit"""
+
+    """ Parameter order dictionary.  Lowercased."""
+    _param_order = {'t': 0, 't/(1+z)': 0, 'beta': 1, 'lambda0': 2,
+                    'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
+                    'alpha': 3, 'fnorm': 4}
+
     def __init__(self, fit):
         """
         Parameters
@@ -30,6 +38,12 @@ class mbb_fit_results(object):
 
         self.par_central_values = [self.par_cen(i) for i in range(5)]
 
+        #Get the best fit point
+        idxmax_flat = self.lnprobability.argmax()
+        idxmax = numpy.unravel_index(idxmax_flat, self.lnprobability.shape)
+        self._best_fit = (self.chain[idxmax[0], idxmax[1], :],
+                          self.lnprobability[idxmax[0], idxmax[1]],
+                          idxmax)
         try:
             self.lir = fit.lir
             self.lir_central_value = self.lir_cen()
@@ -51,20 +65,50 @@ class mbb_fit_results(object):
         except AttributeError:
             pass
 
+        
+    @property
     def best_fit(self):
-        """ Finds the best fitting point that occurred during the fit
+        """ Gets the best fitting point that occurred during the fit
 
         Returns
         -------
         tup : tuple
          A tuple of the parameters, the log probability, and the
-         index into lnprobability"""
+         index into lnprobability
+         """
 
-        idxmax_flat = self.lnprobability.argmax()
-        idxmax = numpy.unravel_index(idxmax_flat, self.lnprobability.shape)
-        return (self.chain[idxmax[0], idxmax[1], :],
-                self.lnprobability[idxmax[0], idxmax[1]],
-                idxmax)
+        return self._best_fit
+
+    @property
+    def best_fit_chisq(self):
+        """ Get the chisq of the best fitting point.
+
+        Returns
+        -------
+        chisq : float
+          The chi2 of the best fitting point.
+        """
+        
+        return -2.0 * self._best_fit[1]
+
+
+    def best_fit_sed(self, wave):
+        """ Get the best fitting SED
+
+        Parameters
+        ----------
+        wave : ndarray
+          Wavelengths the sed is desired at, in microns
+
+        Returns
+        -------
+        sed : ndarray
+          The sed corresponding to the best fitting parameters at
+          the wavelengths specified by wave
+         """
+        
+        return like.get_sed(self.like._best_fit[0], wave)
+
 
     def _parcen_internal(self, array, percentile, lowlim=None,
                          uplim=None):
@@ -153,6 +197,7 @@ class mbb_fit_results(object):
 
     @property
     def lir_chain(self):
+        """ Get flattened chain of l_ir values in 10^12 solar luminosities"""
         if not hasattr(self, 'lir'): return None
         return self.lir.flatten()
 
@@ -184,6 +229,7 @@ class mbb_fit_results(object):
 
     @property
     def lagn_chain(self):
+        """ Get flattened chain of l_agn values in 10^12 solar luminosities"""
         if not hasattr(self, 'lagn'): return None
         return self.lagn.flatten()
 
@@ -215,6 +261,7 @@ class mbb_fit_results(object):
 
     @property
     def dustmass_chain(self):
+        """ Get flattened chain of dustmass values in 10^8 solar masses"""
         if not hasattr(self, 'dustmass'): return None
         return self.dustmass.flatten()
 
@@ -243,32 +290,85 @@ class mbb_fit_results(object):
         return self._parcen_internal(self.dustmass.flatten(), percentile,
                                      lowlim=lowlim, uplim=uplim)
 
-    def parameter_chain(self, paridx):
-        """ Gets flattened chain for parameter number"""
+    def parameter_chain(self, param):
+        """ Gets flattened chain for parameter
+
+
+        Parameters
+        ----------
+        param : int or string
+          Parameter specification
+        """
+
+        if isinstance(param, str):
+            paridx = self._param_order[param.lower()]
+        else:
+            paridx = int(param)
         if paridx < 0 or paridx > 5:
             raise ValueError("invalid parameter index %d" % paridx)
+
         return self.chain[:,:,paridx].flatten()
 
-    def par_cen(self, paridx, percentile=68.3, lowlim=None, uplim=None):
+    def par_cen(self, param, percentile=68.3, lowlim=None, uplim=None):
         """ Gets the central confidence interval for the parameter
 
-        The parameters are in the order T, beta, lambda0, alpha, fnorm"""
+        Parameters
+        ----------
+        param : int or string
+          Parameter specification
+
+        percentile : float
+          Percentile of limit to compute
+
+        lowlim : float
+          Lower limit on parameter
+
+        uplim : float
+          Upper limit on parameter
+
+        Notes
+        -----
+        The parameters are in the order T, beta, lambda0, alpha, fnorm
+        """
 
         if percentile <= 0 or percentile >= 100.0:
             raise ValueError("percentile needs to be between 0 and 100")
+        if isinstance(param, str):
+            paridx = self._param_order[param.lower()]
+        else:
+            paridx = int(param)
+
         if paridx < 0 or paridx > 5:
             raise ValueError("invalid parameter index %d" % paridx)
 
         return self._parcen_internal(self.parameter_chain(paridx), 
                                      percentile, lowlim=lowlim, uplim=uplim)
 
-    def par_lowlim(self, paridx, percentile=68.3):
+    def par_lowlim(self, param, percentile=68.3):
         """ Gets the lower limit for the parameter
 
-        The parameters are in the order T, beta, lambda0, alpha, fnorm"""
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification
+
+        percentile : float
+          Percentile of limit to compute
+
+        Notes
+        -----
+        The parameters are in the order T, beta, lambda0, alpha, fnorm
+        """
 
         if percentile <= 0 or percentile >= 100.0:
             raise ValueError("percentile needs to be between 0 and 100")
+
+        if isinstance(param, str):
+            paridx = self._param_order[param.lower()]
+        else:
+            paridx = int(param)
+
         if paridx < 0 or paridx > 5:
             raise ValueError("invalid parameter index %d" % paridx)
 
@@ -279,16 +379,42 @@ class mbb_fit_results(object):
     def par_uplim(self, paridx, percentile=68.3):
         """ Gets the upper limit for the parameter
 
-        The parameters are in the order T, beta, lambda0, alpha, fnorm"""
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification
+
+        percentile : float
+          Percentile of limit to compute
+
+        Notes
+        -----
+        The parameters are in the order T, beta, lambda0, alpha, fnorm
+        """
 
         if percentile <= 0 or percentile >= 100.0:
             raise ValueError("percentile needs to be between 0 and 100")
-        if paridx < 0 or paridx > 5:
-            raise ValueError("invalid parameter index %d" % paridx)
+
+        if isinstance(param, str):
+            paridx = self._param_order[param.lower()]
+        else:
+            paridx = int(param)
 
         svals = self.chain[:,:,paridx].flatten()
         svals.sort()
         return svals[round(0.01 * percentile * len(svals))]
+
+    @property
+    def data(self):
+        """ Get tuple of data wavelengths, flux densities"""
+        if not like.data_read: return None
+        return (self.like.data_wave, self.like.data_flux)
+
+    @property
+    def covmatrix(self):
+        """ Get covariance matrix, or None if none present"""
+        return self.like.data_covmatrix
 
     def __str__(self):
         """ Print out the parameter central values"""
@@ -406,7 +532,14 @@ class mbb_freqint(object):
         
 
     def __call__(self, params):
-        """ Evaluates frequency integral."""
+        """ Evaluates frequency integral.
+
+        Parameters
+        ----------
+        params : ndarray
+          Array of parameter values in order T, beta, lambda0, alpha, fnorm
+        """
+
         mbb = modified_blackbody(params[0], params[1], params[2],
                                  params[3], params[4], opthin=self._opthin,
                                  noalpha=self._noalpha)
@@ -477,13 +610,45 @@ class mbb_fit(object):
             self.like.read_cov(covfile, extn=covextn)
 
     def set_data(self, wave, flux, flux_unc, covmatrix=None):
-        """ Set photometry and covariance matrix"""
+        """ Set photometry and covariance matrix
+
+        Parameters
+        ----------
+        wave : ndarray
+          Wavelengths, in microns, of the data
+
+        flux : ndarray
+          Flux desnity of data, in mJy
+
+        flux_unc : ndarray
+          Flux density uncertainties, in mJy
+
+        covmatrix : ndarray
+          Covariance matrix.  flux_unc is ignored if this is present.
+
+        """
+
         self.like.set_phot(wave, flux, flux_unc)
         if not covmatrix is None:
             self.like.set_cov(covmatrix)
 
     def run(self, nburn, nsteps, p0, verbose=False):
-        """Do emcee run"""
+        """Do emcee run
+        
+        Parameters
+        ----------
+        nburn : int
+          Number of burn-in steps per walker
+
+        nsteps : int
+          Number of steps after burn in per walker
+
+        p0 : ndarray (nwalkers x 5)
+          Initial values of parameters
+
+        verbose : bool
+          Print out informational messages during run.
+        """
 
         # Make sure we have data
         if not self.like.data_read:

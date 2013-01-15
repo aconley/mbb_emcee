@@ -5,11 +5,6 @@ import astropy.cosmology
 
 __all__ = ["likelihood"]
 
-""" Parameter order dictionary"""
-param_order = {'t': 0, 't/(1+z)': 0, 'beta': 1, 'lambda0': 2,
-                'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
-                'alpha': 3, 'fnorm': 4}
-
 """Class holding data, defining likelihood"""
 class likelihood(object) :
 
@@ -89,7 +84,20 @@ class likelihood(object) :
         self._badval = float("-inf")
 
     def set_phot(self, wave, flux, flux_unc):
-        """ Sets photometry"""
+        """ Sets photometry.
+
+        Parameters
+        ----------
+        wave : ndarray
+          Wavelengths, in microns, of the data
+
+        flux : ndarray
+          Flux desnity of data, in mJy
+
+        flux_unc : ndarray
+          Flux density uncertainties, in mJy
+        """
+
         self._wave = np.asarray(wave)
         self._ndata = len(self._wave) 
         if self._ndata == 0:
@@ -113,8 +121,20 @@ class likelihood(object) :
         self._data_read = True
 
     def read_phot(self, filename) :
-        """Reads in the photometry file, storing the wave [um],
-        flux [mJy] and uncertainties [mJy]"""
+        """Reads in the photometry file.
+
+        Parameters
+        ----------
+        filename : string
+          File to read in
+
+        Notes
+        -----
+        The input file should consist of lines of the form
+          wavelength flux_density uncertainty
+        The wavelength should be in microns, the flux density in mJy
+        and the uncertainties in mJy.
+        """
         import asciitable
         if not isinstance(filename, basestring):
             raise TypeError("filename must be string-like")
@@ -127,10 +147,12 @@ class likelihood(object) :
 
     @property
     def data_read(self):
+        """ Has the data been read in?"""
         return self._data_read
 
     @property
     def ndata(self):
+        """ Get number of data points"""
         if self._data_read:
             return self._ndata
         else:
@@ -138,6 +160,7 @@ class likelihood(object) :
 
     @property 
     def data_wave(self):
+        """ Get wavelengths of data points, in microns"""
         if self._data_read:
             return self._wave
         else:
@@ -145,6 +168,7 @@ class likelihood(object) :
 
     @property 
     def data_flux(self):
+        """ Get flux densities of data, in mJy"""
         if self._data_read:
             return self._flux
         else:
@@ -152,13 +176,27 @@ class likelihood(object) :
 
     @property 
     def data_flux_unc(self):
+        """ Get flux density uncertainties of data, in mJy.
+
+        Notes
+        -----
+        If a covariance matrix is available, these values are
+        not used by the fits.
+        """
+
         if self._data_read:
             return self._flux_unc
         else:
             return None
 
     def set_cov(self, covmatrix):
-        """ Sets covariance matrix"""
+        """ Sets covariance matrix.
+
+        Parameters
+        ----------
+        covmatrix : ndarray
+          Covariance matrix.
+        """
 
         if not self._data_read:
             raise Exception("Can't set covariance matrix without photometry")
@@ -177,22 +215,33 @@ class likelihood(object) :
 
 
     def read_cov(self, filename, extn=0) :
-        """Reads in the covariance matrix from the specified
-        extension of the input FITS file (in extension extn)"""
-        import pyfits
+        """Reads in the covariance matrix from the specified FITS file.
+
+        Parameters
+        ----------
+        filename : string
+          Name of FITS file
+
+        extn : int
+          Which extention of the FITS file to read from.
+        """
+
+        import astropy.io.fits
 
         if not self._data_read:
             raise Exception("Can't read in covaraince matrix without phot")
 
-        hdu = pyfits.open(filename)
+        hdu = astropy.io.fits.open(filename)
         self.set_cov(hdu[extn].data)
 
     @property
     def has_data_covmatrix(self):
+        """ Does this object have a flux density covariance matrix?"""
         return self._has_covmatrix
 
     @property
     def data_covmatrix(self):
+        """ Get the flux density covariance matrix, in mJy"""
         if self._has_covmatrix:
             return self._covmatrix
         else:
@@ -240,7 +289,7 @@ class likelihood(object) :
           Parameter specification
         """
         if isinstance(param, str):
-            self._lowlim[self._param_order[param]] = val
+            self._lowlim[self._param_order[param.lower()]] = val
         else:
             self._lowlim[param] = val
 
@@ -261,6 +310,12 @@ class likelihood(object) :
         return self._lowlim[paramidx]
 
     def get_lowlims(self):
+        """ Get the list of lower parameter limits.
+
+        Notes
+        -----
+        The order is T/(1+z), beta, lambda0 (1+z), alpha, fnorm.
+        """
         return self._lowlim
 
     def set_uplim(self, param, val) :
@@ -271,6 +326,9 @@ class likelihood(object) :
 
         param : int or string
           Parameter specification
+
+        val : float
+          Value to set.
         """
         if isinstance(param, str):
             paramidx = self._param_order[param.lower()]
@@ -288,6 +346,12 @@ class likelihood(object) :
 
         param : int or string
           Parameter specification
+
+        mean : float
+          Mean of prior
+
+        sigma : float
+          Standard deviation of the prior
         """
 
         if isinstance(param, str):
@@ -304,11 +368,22 @@ class likelihood(object) :
     def _check_lowlim(self,pars) :
         """Checks to see if a given parameter set passes the lower limits.
 
-        Returns True if it passes, False if it doesn't.
+        Parameters
+        ----------
+        pars : ndarray
+          Set of parameters in order T/(1+z), beta, lambda0 (1+z), alpha, 
+          fnorm.
+        
+        Returns
+        -------
+        lowlim_pass : bool
+         True if this set of parameters passes, False if it doesn't.
 
-        Unlike the upper limits, in the most common case the
-        SED simply can't be compuated below the lower limits,
-        so we can't just apply a likelihood penalty.
+        Notes
+        -----
+         Unlike the upper limits, in the most common case the
+         SED simply can't be compuated below the lower limits,
+         so we can't just apply a smooth likelihood penalty.
         """
 
         if len(pars) != 5:
@@ -324,6 +399,21 @@ class likelihood(object) :
     def _uplim_prior(self,pars):
         """ Gets likelihood of upper limit priors
 
+        Parameters
+        ----------
+        pars : ndarray
+          Set of parameters in order T/(1+z), beta, lambda0 (1+z), alpha, 
+          fnorm.
+        
+        Returns
+        -------
+        like_penalty : float
+         Penalty to apply to log likelihood based on these parameters.
+         This should be added to the log likelihood (that is, it is
+         negative).
+
+        Notes
+        -----
         For values above the upper limit, applies a Gaussian
         penalty centered at the limit with sigma = limit/100.0.
         A soft upper limit seems to work better than a hard one"""
@@ -344,7 +434,11 @@ class likelihood(object) :
     def _set_sed(self, pars):
         """Set up the SED for the provided parameters
 
-        The order of pars is T, beta, lambda0, alpha, fnorm
+        Parameters
+        ----------
+        pars : ndarray
+          Set of parameters in order T/(1+z), beta, lambda0 (1+z), alpha, 
+          fnorm.
         """
 
         if len(pars) != 5:
@@ -356,10 +450,21 @@ class likelihood(object) :
         
 
     def get_sed(self, pars, wave) :
-        """Returns the model SED at the specified wavelength -- which
-        can be an array (numpy or otherwise)
+        """Returns the model SED at the specified wavelengths.
 
-        The order of pars is T, beta, lambda0, alpha, fnorm
+        Parameters
+        ----------
+        pars : ndarray
+          Set of parameters in order T/(1+z), beta, lambda0 (1+z), alpha, 
+          fnorm.
+
+        wave : float or ndarray
+          Wavelength that SED is desired at, in microns.
+
+        Returns
+        -------
+        sed : float or ndarray
+          Desired SED in mJy.
         """
 
         self._set_sed(pars)
@@ -368,7 +473,16 @@ class likelihood(object) :
     def __call__(self, pars) :
         """Gets log likelihood assuming Gaussian errors: log P( pars | data )
 
-        The order of pars is T, beta, lambda0, alpha, fnorm
+        Parameters
+        ----------
+        pars : ndarray
+          Set of parameters in order T/(1+z), beta, lambda0 (1+z), alpha, 
+          fnorm.
+
+        Returns
+        -------
+        loglike : float
+          Log likelihood of parameter set.
         """
         
         # First check limits

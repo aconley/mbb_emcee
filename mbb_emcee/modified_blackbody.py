@@ -207,56 +207,99 @@ class modified_blackbody(object):
 
     @property
     def T(self):
+        """ Get temperature / (1+z) in K"""
         return self._T
 
     @property
     def beta(self):
+        """ Get Beta"""
         return self._beta
     
     @property
     def lambda0(self):
+        """ Get lambda_0 (1+z) in microns"""
+        if self._opthin: return None
         return self._lambda0
 
     @property
     def alpha(self):
+        """ Get alpha"""
+        if self._noalpha: return None
         return self._alpha
     
     @property
     def fnorm(self):
+        """ Get normalization flux at wavenorm in mJy"""
         return self._fnorm
 
     @property
     def wavenorm(self):
+        """ Get normalization flux wavelength in microns"""
         return self._wavenorm
 
     @property
     def has_alpha(self):
+        """ Does this modified_blackbody use a blue side power law?"""
         return self._hasalpha
 
     @property
     def optically_thin(self):
+        """ Does this modified_blackbody assume it is optically thin?"""
         return self._opthin
 
     @property
     def wavemerge(self):
-        """Get the merge wavelength [microns]"""
+        """Get the merge wavelength in microns"""
         if not self._hasalpha:
             return None
         else:
             return self._hcokt / self._xmerge
 
     def __repr__(self):
-        retstr = "modified_blackbody(%.2g, %.2g,%.2g, %.2g, %.2g,"+\
-            "noalpha=%s, opthin=%s)"
-        return retstr % (self._T, self._beta, self._lambda0, self._alpha,
-                         self._fnorm, not self._hasalpha, self._opthin)
+        if self._hasalpha:
+            if self._opthin:
+                retstr = "modified_blackbody(%.2g, %.2g, None, %.2g, %.2g," + \
+                    " opthin=True)"
+                return retstr % (self._T, self._beta, self._alpha,
+                                 self._fnorm)
+            else:
+                retstr = "modified_blackbody(%.2g, %.2g, %.2g, %.2g, %.2g," + \
+                    " opthin=True)"
+                return retstr % (self._T, self._beta, self.lambda0,
+                                 self.alpha, self._fnorm)
+        else:
+            if self._opthin:
+                retstr = "modified_blackbody(%.2g, %.2g, None, None, %.2g," + \
+                    " noalpha=True, opthin=True)"
+                return retstr % (self._T, self._beta, self._fnorm)
+            else:
+                retstr = "modified_blackbody(%.2g, %.2g, %.2g, None, %.2g," + \
+                    " noalpha=True)"
+                return retstr % (self._T, self._beta, self.lambda0,
+                                 self._fnorm)
 
 
     def __str__(self):
-        retstr = "modified blackbody(T: %.2g beta: %.2g lambda0: %.2g "+\
-            "alpha: %.2g fnorm: %.2g noalpha: %s opthin: %s)"
-        return retstr % (self._T, self._beta, self._lambda0, self._alpha,
-                         self._fnorm, not self._hasalpha, self._opthin)
+        if self._hasalpha:
+            if self._opthin:
+                retstr = "modified_blackbody(T: %.2g beta: %.2g " + \
+                    "alpha: %.2g fnorm: %.2g)"
+                return retstr % (self._T, self._beta, self._alpha,
+                                 self._fnorm)
+            else:
+                retstr = "modified_blackbody(T: %.2g beta: %.2g " + \
+                    "lambda0: %.2g alpha: %.2g fnorm: %.2g)"
+                return retstr % (self._T, self._beta, self.lambda0,
+                                 self._alpha, self._fnorm)
+        else:
+            if self._opthin:
+                retstr = "modified_blackbody(T: %.2g beta: %.2g fnorm: %.2g)"
+                return retstr % (self._T, self._beta, self._fnorm)
+            else:
+                retstr = "modified_blackbody(T: %.2g beta: %.2g " + \
+                    "lambda0: %.2g fnorm: %.2g)"
+                return retstr % (self._T, self._beta, self.lambda0,
+                                 self._fnorm)  
 
     def f_nu(self, freq):
         """Evaluate modifed blackbody at specified frequencies.
@@ -362,7 +405,7 @@ class modified_blackbody(object):
                 return 3 * x**2 / efac - math.exp(x) * x**3 / efac**2
 
     def max_wave(self):
-        """ Attempt to find the wavelength of maximum emission
+        """ Get the wavelength of maximum emission in f_nu units.
 
         Returns
         -------

@@ -284,9 +284,12 @@ if __name__ == "__main__":
         if parse_results.verbose: print "Computing dust mass"
         fit.get_dustmass(parse_results.redshift, maxidx=parse_results.maxidx)
 
+    res = mbb_fit_results(fit)
+    if parse_results.verbose:
+        print res
 
     # Jam parse_results into a output struct, and save that
     if parse_results.verbose : print "Saving results"
+
     with open(parse_results.outfile,'wb') as fl:
-        res = mbb_results(fit)
         pickle.dump(res, fl)
