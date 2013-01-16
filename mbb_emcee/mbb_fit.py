@@ -440,12 +440,12 @@ class mbb_fit_results(object):
             else:
                 retstr += "%0.2f +%0.2f -%0.2f" % self.par_central_values[i]
                 retstr += " (low lim: %0.2f" % self.like.lowlim(i)
-            if self.like.has_uplim(i):
-                retstr += " upper lim: %0.2f" % self.like.uplim(i)
-            if self.like.has_gaussian_prior(i):
-                retstr += " prior: %0.2f %0.2f" %\
-                    self.like.get_gaussian_prior(i)
-            retstr += ") %s\n" % unit
+                if self.like.has_uplim(i):
+                    retstr += " upper lim: %0.2f" % self.like.uplim(i)
+                if self.like.has_gaussian_prior(i):
+                    retstr += " prior: %0.2f %0.2f" %\
+                        self.like.get_gaussian_prior(i)
+                retstr += ") %s\n" % unit
 
         if not self.like.opthin:
             if self.fixed[2]:
@@ -481,19 +481,19 @@ class mbb_fit_results(object):
             retstr += "Alpha not used\n"
         
         retstr += "Number of data points: %d\n" % self.like.ndata
-        retstr += "ChiSquare of best fit point: %0.2f\n" % self.best_fit_chisq
+        retstr += "ChiSquare of best fit point: %0.2f" % self.best_fit_chisq
 
         if hasattr(self,'lir_central_value'):
-            retstr += "L_IR: %0.2f +%0.2f -%0.2f [10^12 Lsun]\n" % \
+            retstr += "\nL_IR: %0.2f +%0.2f -%0.2f [10^12 Lsun]" % \
                 self.lir_central_value
         if hasattr(self,'lagn_central_value'):
-            retstr += "L_AGN: %0.2f +%0.2f -%0.2f [10^12 Lsun]\n" % \
+            retstr += "\nL_AGN: %0.2f +%0.2f -%0.2f [10^12 Lsun]" % \
                 self.lagn_central_value
         if hasattr(self,'dustmass_central_value'):
-            retstr += "M_dust: %0.2f +%0.2f -%0.2f [10^8 Msun]\n" % \
+            retstr += "\nM_dust: %0.2f +%0.2f -%0.2f [10^8 Msun]" % \
                 self.dustmass_central_value
         if hasattr(self,'peaklambda_central_value'):
-            retstr += "lambda_peak: %0.2f +%0.2f -%0.2f [um]\n" % \
+            retstr += "\nlambda_peak: %0.2f +%0.2f -%0.2f [um]" % \
                 self.peaklambda_central_value
             
         return retstr
@@ -1090,13 +1090,21 @@ class mbb_fit(object):
                         sed.max_wave()
                     prevstep = currstep
 
-    def get_lir(self, redshift, maxidx=None):
-        """ Get 8-1000 micron LIR from chain in 10^12 solar luminosities"""
+    def get_lir(self, redshift, maxidx=None, lumdist=None):
+        """ Computes 8-1000 micron LIR from chain in 10^12 solar luminosities.
 
-        try:
-            import astropy.cosmology
-        except ImportError:
-            raise ImportError("Need to have astropy installed if getting LIR")
+        Parameters
+        ----------
+        redshift : float
+          Redshift of source.
+        
+        maxidx : int
+          Maximum index in each walker to use.  Ignored if threading.
+
+        lumdist : float
+          Luminosity distance in Mpc.  Otherwise computed from redshift
+          assuming WMAP 7 cosmological model.
+        """
 
         if not self._sampled:
             raise Exception("Chain has not been run in get_lir")
@@ -1105,9 +1113,18 @@ class mbb_fit(object):
         # solar luminosities; the prefactor is
         # 4 * pi * mpc_to_cm^2/L_sun
         z = float(redshift)
-        if z <= 0:
-            raise ValueError("Redshift is not positive: %f" % z)
-        dl = astropy.cosmology.WMAP7.luminosity_distance(z) #Mpc
+        if not lumdist is None:
+            if z <= -1:
+                raise ValueError("Redshift is less than -1: %f" % z)
+            dl = float(lumdist)
+            if dl <= 0.0:
+                raise ValueError("Invalid luminosity distance: %f" % dl)
+        else:
+            if z <= 0:
+                raise ValueError("Redshift is invalid: %f" % z)
+            import astropy.cosmology
+            dl = astropy.cosmology.WMAP7.luminosity_distance(z) #Mpc
+
         lirprefac = 3.11749657e4 * dl**2 # Also converts to 10^12 lsolar
 
         # L_IR defined as between 8 and 1000 microns (rest)
@@ -1148,9 +1165,22 @@ class mbb_fit(object):
                             lirprefac * integrator(prevstep)
                         prevstep = currstep
 
-    def get_lagn(self, redshift, maxidx=None):
-        """Get 42.5-112.5 micron luminosity from chain in 10^12 solar 
-        luminosites"""
+    def get_lagn(self, redshift, maxidx=None, lumdist=None):
+        """ Compute 42.5-112.5 micron luminosity from chain in 10^12 solar 
+        luminosites
+
+        Parameters
+        ----------
+        redshift : float
+          Redshift of source.
+        
+        maxidx : int
+          Maximum index in each walker to use.  Ignored if threading.
+
+        lumdist : float
+          Luminosity distance in Mpc.  Otherwise computed from redshift
+          assuming WMAP 7 cosmological model.
+        """
 
         try:
             import astropy.cosmology
@@ -1160,15 +1190,22 @@ class mbb_fit(object):
         if not self._sampled:
             raise Exception("Chain has not been run in get_agn")
 
-        # Get luminosity distance in cm for correction
-        z = float(redshift)
-        if z <= 0:
-            raise ValueError("Redshift is not positive: %f" % z)
-        dl = astropy.cosmology.WMAP7.luminosity_distance(z)
-
         # 4*pi*dl^2/L_sun in cgs -- so the output will be in 
         # solar luminosities; the prefactor is
         # 4 * pi * mpc_to_cm^2/L_sun
+        z = float(redshift)
+        if not lumdist is None:
+            if z <= -1:
+                raise ValueError("Redshift is less than -1: %f" % z)
+            dl = float(lumdist)
+            if dl <= 0.0:
+                raise ValueError("Invalid luminosity distance: %f" % dl)
+        else:
+            if z <= 0:
+                raise ValueError("Redshift is invalid: %f" % z)
+            import astropy.cosmology
+            dl = astropy.cosmology.WMAP7.luminosity_distance(z) #Mpc
+
         lagnprefac = 3.11749657e4 * dl**2
 
         # L_IR defined as between 42.5 and 122.5 microns (rest)
@@ -1229,25 +1266,44 @@ class mbb_fit(object):
             dustmass *= op_fac
         return dustmass
 
-    def get_dustmass(self, redshift, maxidx=None):
-        """Get dust mass in 10^8 M_sun from chain"""
+    def get_dustmass(self, redshift, maxidx=None, lumdist=None):
+        """Compute dust mass in 10^8 M_sun from chain
+
+        Parameters
+        ----------
+        redshift : float
+          Redshift of source.
+        
+        maxidx : int
+          Maximum index in each walker to use.  Ignored if threading.
+
+        lumdist : float
+          Luminosity distance in Mpc.  Otherwise computed from redshift
+          assuming WMAP 7 cosmological model.
+        """
 
         # This one is not parallelized because the calculation
         # is relatively trivial
-        try:
-            import astropy.cosmology
-        except ImportError:
-            raise ImportError("Need to have astropy installed if getting LIR")
 
         if not self._sampled:
             raise Exception("Chain has not been run in get_mdust")
 
         # Get luminosity distance
         z = float(redshift)
-        if z <= 0:
-            raise ValueError("Redshift is not positive: %f" % z)
+        if not lumdist is None:
+            if z <= -1:
+                raise ValueError("Redshift is less than -1: %f" % z)
+            dl = float(lumdist)
+            if dl <= 0.0:
+                raise ValueError("Invalid luminosity distance: %f" % dl)
+        else:
+            if z <= 0:
+                raise ValueError("Redshift is invalid: %f" % z)
+            import astropy.cosmology
+            dl = astropy.cosmology.WMAP7.luminosity_distance(z) #Mpc
+
         mpc_to_cm = 3.08567758e24
-        dl = astropy.cosmology.WMAP7.luminosity_distance(z) * mpc_to_cm
+        dl *= mpc_to_cm
         dl2 = dl**2
         opz = 1.0 + z
 

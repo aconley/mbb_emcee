@@ -101,6 +101,8 @@ if __name__ == "__main__":
                         help="Lower limit on alpha (Def:0)")
     parser.add_argument("--lowFnorm",action='store',type=float,default=None,
                         help="Lower limit on fnorm (Def:0)")
+    parser.add_argument("--lumdist",action='store',type=float,default=None,
+                        help="Luminosity distance in Mpc (Def: computed from z)")
     parser.add_argument('-p','--photdir',action='store',
                         help="Directory to look for files in",
                         default=None)
@@ -249,7 +251,8 @@ if __name__ == "__main__":
         if parse_results.redshift is None:
             raise ValueError("Must provide redshift if computing L_IR")
         if parse_results.verbose: print "Computing L_IR (8-1000)"
-        fit.get_lir(parse_results.redshift, maxidx=parse_results.maxidx)
+        fit.get_lir(parse_results.redshift, maxidx=parse_results.maxidx,
+                    lumdist=parse_results.lumdist)
 
 
     # L_AGN computation
@@ -257,18 +260,20 @@ if __name__ == "__main__":
         if parse_results.redshift is None:
             raise ValueError("Must provide redshift if computing L_AGN")
         if parse_results.verbose: print "Computing L_AGN (42.5-122.5)"
-        fit.get_lagn(parse_results.redshift, maxidx=parse_results.maxidx)
+        fit.get_lagn(parse_results.redshift, maxidx=parse_results.maxidx,
+                     lumdist=parse_results.lumdist)
 
     # M_dust computation
     if parse_results.get_dustmass: 
         if parse_results.redshift is None:
             raise ValueError("Must provide redshift if computing m_dust")
         if parse_results.verbose: print "Computing dust mass"
-        fit.get_dustmass(parse_results.redshift, maxidx=parse_results.maxidx)
+        fit.get_dustmass(parse_results.redshift, maxidx=parse_results.maxidx,
+                         lumdist=parse_results.lumdist)
 
     res = mbb_fit_results(fit)
     if parse_results.verbose:
-        print "Fit results:\n"
+        print "Fit results:"
         print res
 
     # Jam parse_results into a output struct, and save that
