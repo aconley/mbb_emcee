@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 import emcee
 import math
 import multiprocessing
@@ -7,6 +7,8 @@ from likelihood import likelihood
 import copy
 
 __all__ = ["mbb_fit", "mbb_fit_results"]
+
+############################################################
 
 # This class holds the results.  Why not just save the
 # fit class?  Because mbb_fit (the fitting class) can involve a 
@@ -30,37 +32,40 @@ class mbb_fit_results(object):
           Fit object
         """
 
+        import copy
+
         assert type(fit) is mbb_fit, "fit is not mbb_fit"
 
-        self.like = fit.like
-        self.chain = fit.sampler.chain
-        self.lnprobability = fit.sampler.lnprobability
+        self.like = copy.deepcopy(fit.like)
+        self.chain = copy.copy(fit.sampler.chain)
+        self.lnprobability = copy.copy(fit.sampler.lnprobability)
+        self.fixed = copy.copy(fit._fixed)
 
         self.par_central_values = [self.par_cen(i) for i in range(5)]
 
         #Get the best fit point
         idxmax_flat = self.lnprobability.argmax()
-        idxmax = numpy.unravel_index(idxmax_flat, self.lnprobability.shape)
+        idxmax = np.unravel_index(idxmax_flat, self.lnprobability.shape)
         self._best_fit = (self.chain[idxmax[0], idxmax[1], :],
                           self.lnprobability[idxmax[0], idxmax[1]],
                           idxmax)
         try:
-            self.lir = fit.lir
+            self.lir = copy.copy(fit.lir)
             self.lir_central_value = self.lir_cen()
         except AttributeError:
             pass
         try:
-            self.lagn = fit.lagn
+            self.lagn = copy.copy(fit.lagn)
             self.lagn_central_value = self.lagn_cen()
         except AttributeError:
             pass
         try:
-            self.dustmass = fit.dustmass
+            self.dustmass = copy.copy(fit.dustmass)
             self.dustmass_central_value = self.dustmass_cen()
         except AttributeError:
             pass
         try:
-            self.peaklambda = fit.peaklambda
+            self.peaklambda = copy.copy(fit.peaklambda)
             self.peaklambda_central_value = self.peaklambda_cen()
         except AttributeError:
             pass
@@ -107,7 +112,7 @@ class mbb_fit_results(object):
           the wavelengths specified by wave
          """
         
-        return like.get_sed(self.like._best_fit[0], wave)
+        return self.like.get_sed(self._best_fit[0], wave)
 
 
     def _parcen_internal(self, array, percentile, lowlim=None,
@@ -147,15 +152,15 @@ class mbb_fit_results(object):
             elif uplim is None:
                 cond = (aint >= float(lowlim)).nonzero()[0]
             else:
-                cond = numpy.logical_and(aint >= float(lowlim),
-                                         aint <= float(uplim)).nonzero()[0]
+                cond = np.logical_and(aint >= float(lowlim),
+                                      aint <= float(uplim)).nonzero()[0]
             if len(cond) == 0:
                 raise Exception("No elements survive lower/upper limit clipping")
             if len(cond) != len(aint):
                 aint = aint[cond]
 
         aint.sort()
-        mnval = numpy.mean(aint)
+        mnval = np.mean(aint)
         pval = (1.0 - 0.01 * pcnt) / 2
         na = len(aint)
         lowidx = int(round(pval * na))
@@ -306,7 +311,7 @@ class mbb_fit_results(object):
         """
 
         if isinstance(param, str):
-            paridx = self.like.get_paramindex[param]
+            paridx = self._param_order[param.lower()]
         else:
             paridx = int(param)
             if paridx < 0 or paridx > 5:
@@ -366,7 +371,7 @@ class mbb_fit_results(object):
         """
 
         if isinstance(param, str):
-            paridx = self.like.get_paramindex[param.lower()]
+            paridx = self._param_order[param.lower()]
         else:
             paridx = int(param)
             if paridx < 0 or paridx > 5:
@@ -397,7 +402,7 @@ class mbb_fit_results(object):
         """
 
         if isinstance(param, str):
-            paridx = self.like.get_paramindex[param.lower()]
+            paridx = self._param_order[param.lower()]
         else:
             paridx = int(param)
             if paridx < 0 or paridx > 5:
@@ -413,7 +418,7 @@ class mbb_fit_results(object):
     @property
     def data(self):
         """ Get tuple of data wavelengths, flux densities"""
-        if not like.data_read: return None
+        if not self.like.data_read: return None
         return (self.like.data_wave, self.like.data_flux)
 
     @property
@@ -430,49 +435,47 @@ class mbb_fit_results(object):
         
         for i,tg, unit in zip(idx, tag, units):
             retstr += "%s: " % tg
-            if self.like._fixed[i]:
+            if self.fixed[i]:
                 retstr += "%0.2f (fixed)\n" % self.chain[:,:,i].mean()
             else:
                 retstr += "%0.2f +%0.2f -%0.2f" % self.par_central_values[i]
-                retstr += " (low lim: %0.2f" % self.like._lowlim[i]
-            if self.like._has_uplim[i]:
-                retstr += " upper lim: %0.2f" % self.like._uplim[i]
-            if self.like._has_gprior[i]:
-                tup = (self.like._gprior_mean[i], 
-                       1.0/math.sqrt(self.like._gprior_ivar[i]))
-                retstr += " prior: %0.2f %0.2f" % tup
+                retstr += " (low lim: %0.2f" % self.like.lowlim(i)
+            if self.like.has_uplim(i):
+                retstr += " upper lim: %0.2f" % self.like.uplim(i)
+            if self.like.has_gaussian_prior(i):
+                retstr += " prior: %0.2f %0.2f" %\
+                    self.like.get_gaussian_prior(i)
             retstr += ") %s\n" % unit
 
-        if not self.like._opthin:
-            if self.like._fixed[2]:
+        if not self.like.opthin:
+            if self.fixed[2]:
                 retstr += "lambda0 (1+z): %0.2f (fixed) [um]\n" %\
                     self.chain[:,:,2].mean()
             else:
                 retstr += "lambda0 (1+z): %0.2f +%0.2f -%0.2f" %\
                     self.par_central_values[2]
-                retstr += " (low lim: %0.2f" % self.like._lowlim[2]
-                if self.like._has_uplim[2]:
-                    retstr += " upper lim: %0.2f" % self.like._uplim[2]
-                if self.like._has_gprior[2]:
-                    tup = (self.like._gprior_mean[2],
-                           1.0/math.sqrt(self.like._gprior_ivar[2]))
-                    retstr += " prior: %0.2f %0.2f" % tup
+                retstr += " (low lim: %0.2f" % self.like.lowlim(2)
+                if self.like.has_uplim(2):
+                    retstr += " upper lim: %0.2f" % self.like.uplim(2)
+                if self.like.has_gaussian_prior(2):
+                    retstr += " prior: %0.2f %0.2f" %\
+                        self.like.get_gaussian_prior(2)
                 retstr += ") [um]\n"
         else:
             retstr += "Optically thin case assumed\n"
 
-        if not self.like._noalpha:
-            if self.like._fixed[3]:
+        if not self.like.noalpha:
+            if self.fixed[3]:
                 retstr += "alpha: %0.2f (fixed)\n" % self.chain[:,:,3].mean()
             else:
-                retstr += "alpha: %0.2f +%0.2f -%0.2f" % self.par_central_values[3]
-                retstr += " (low lim: %0.2f" % self.like._lowlim[3]
-                if self.like._has_uplim[3]:
-                    retstr += " upper lim: %0.2f" % self.like._uplim[3]
-                if self.like._has_gprior[3]:
-                    tup = (self.like._gprior_mean[3],
-                           1.0/math.sqrt(self.like._gprior_ivar[3]))
-                    retstr += " prior: %0.2f %0.2f" % tup
+                retstr += "alpha: %0.2f +%0.2f -%0.2f" %\
+                    self.par_central_values[3]
+                retstr += " (low lim: %0.2f" % self.like.lowlim(3)
+                if self.like.has_uplim(3):
+                    retstr += " upper lim: %0.2f" % self.like.uplim(3)
+                if self.like.has_gaussian_prior(3):
+                    retstr += " prior: %0.2f %0.2f" %\
+                        self.like.get_gaussian_prior(3)
                 retstr += ")\n"
         else:
             retstr += "Alpha not used\n"
@@ -495,7 +498,9 @@ class mbb_fit_results(object):
             
         return retstr
 
-# The idea is to allow this to also be multiprocessed
+############################################################
+
+# The idea is to allow this to be multiprocessed
 class mbb_freqint(object):
     """ Does frequency integration"""
     
@@ -554,12 +559,23 @@ class mbb_freqint(object):
                                  noalpha=self._noalpha)
         return mbb.freq_integrate(self._minwave_obs, self._maxwave_obs)
 
+############################################################
 
 class mbb_fit(object):
     """ Does fit"""
 
+    """ Parameter order dictionary.  Lowercased."""
+    _param_order = {'t': 0, 't/(1+z)': 0, 'beta': 1, 'lambda0': 2,
+                    'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
+                    'alpha': 3, 'fnorm': 4}
+
+    """ Parameter names"""
+    _parnames = np.array(['T/(1+z)', 'Beta', 'Lambda0*(1+z)', 
+                          'Alpha', 'Fnorm'])
+
+
     def __init__(self, nwalkers=250, photfile=None, covfile=None, 
-                 covextn=None, wavenorm=500.0, noalpha=False, 
+                 covextn=0, wavenorm=500.0, noalpha=False, 
                  opthin=False, nthreads=1):
         """
         Parameters
@@ -593,13 +609,47 @@ class mbb_fit(object):
         self._noalpha = noalpha
         self._opthin = opthin
         self._wavenorm = float(wavenorm)
+        self._nwalkers = int(nwalkers)
         self._nthreads = int(nthreads)
         self.like = likelihood(photfile=photfile, covfile=covfile, 
                                covextn=covextn, wavenorm=wavenorm, 
                                noalpha=noalpha, opthin=opthin)
-        self.sampler = emcee.EnsembleSampler(nwalkers, 5, self.like,
+        self.sampler = emcee.EnsembleSampler(self._nwalkers, 5, self.like,
                                              threads=self._nthreads)
         self._sampled = False
+
+        # Params are in the order T, beta, lambda0, alpha, fnorm
+        self._fixed = [False, False, False, False, False]
+
+    @property
+    def noalpha(self):
+        """ Not using blue side power law?"""
+        return self._noalpha
+    
+    @property
+    def opthin(self):
+        """ Assuming optically thin model?"""
+        return self._opthin
+
+    @property
+    def nwalkers(self):
+        """ Number of walkers"""
+        return self._nwalkers
+
+    @property
+    def nthreads(self):
+        """ Number of threads"""
+        return self._nthreads
+
+    @property
+    def sampled(self):
+        """ Has the distribution been sampled?"""
+        return self._sampled
+
+    @property
+    def fixed(self):
+        """ Which parameters are fixed?"""
+        return self._fixed
 
     def read_data(self, photfile, covfile=None, covextn=0):
         """ Read in photometry data from files
@@ -642,6 +692,297 @@ class mbb_fit(object):
         if not covmatrix is None:
             self.like.set_cov(covmatrix)
 
+    def fix_param(self, param):
+        """Fixes the specified parameter.
+
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification.  Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+        """
+
+        if isinstance(param, str):
+            paramidx = self._param_order[param.lower()]
+        else:
+            paramidx = int(param)
+            
+        self._fixed[paramidx] = True
+
+    def unfix_param(self, param):
+        """Un-fixes the specified parameter.
+        
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification. Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+        """
+
+        if isinstance(param, str):
+            paramidx = self._param_order[param.lower()]
+        else:
+            paramidx = int(param)
+            
+        self._fixed[paramidx] = False
+
+    def set_lowlim(self, param, val) :
+        """Sets the specified parameter lower limit to value.
+
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification. Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+        """
+        self.like.set_lowlim(param, val)
+
+    def lowlim(self, param) :
+        """Gets the specified parameter lower limit value.
+
+        Parameters
+        ----------
+        param : int or string
+          Parameter specification. Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+
+        Returns 
+        -------
+        limit : float
+          Lower limit on parameter value
+        """
+        return self.like.lowlim(param)
+
+
+    def set_uplim(self, param, val) :
+        """Sets the specified parameter upper limit to value.
+
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification. Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+        """
+        self.like.set_uplim(param, val)
+
+    def has_uplim(self, param):
+        """ Does the likelihood have an upper limit for a given parameter?
+
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification.  Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+
+        Returns
+        -------
+        val : bool
+          True if there is an upper limit, false otherwise
+        """
+        return self.like.has_uplim(param)
+
+    def uplim(self, param) :
+        """Gets the specified parameter upper limit value.
+
+        Parameters
+        ----------
+        param : int or string
+          Parameter specification. Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+
+        Returns 
+        -------
+        limit : float
+          Upper limit on parameter value, or None if there is none
+        """
+        return self.like.uplim(param)
+
+
+    def set_gaussian_prior(self, param, mean, sigma):
+        """Sets up a Gaussian prior on the specified parameter.
+
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification.  Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+
+        mean : float
+          Mean of Gaussian prior
+
+        sigma : float
+          Sigma of Gaussian prior
+        """
+        self.like.set_gaussian_prior(param, mean, sigma)
+
+    def has_gaussian_prior(self, param):
+        """ Does the given parameter have a Gaussian prior set?
+
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification.  Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+          
+        Returns
+        -------
+        has_prior : bool
+          True if a Gaussian prior is set, False otherwise
+        """
+        return self.like.has_gaussian_prior(param)
+
+    def get_gaussian_prior(self, param):
+        """ Return Gaussian prior values
+
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification.  Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+          
+        Returns
+        -------
+        tup : tuple or None
+          Mean, variance if set, None otherwise
+        """
+        return self.like.get_gaussian_prior(param)
+
+    def generate_initial_values(self, initvals, initsigma):
+        """ Generate a set of nvalues initial parameters.
+
+        Parameters
+        ----------
+        initvals : ndarray
+          Initial parameter values in order T, beta, lambda0, alpha, fnorm.
+
+        initsigma : ndarray
+          Sigma values for each parameter.  Ignored if parameter is fixed.
+
+        Returns
+        -------
+        p0 : ndarray
+          A nwalkers x 5 array of initial values.
+
+        Notes
+        -----
+        This is only interesting because it has to obey parameter limits.
+        As a consequence, the user-provided initial values may be ignored.
+        This will take care of fixed parameters correctly.
+        """
+
+        import copy
+
+        if len(initvals) != 5:
+            raise ValueError("Initial values not expected length")
+        if len(initsigma) != 5:
+            raise ValueError("Initial sigma values not expected length")
+        
+        # First -- see if any of the initial values lie outside
+        # the upper/lower limits.
+        outside_limits = [False] * 5
+        for i, val in enumerate(initvals):
+            #Everything has a lower limit...
+            if val < self.lowlim(i): 
+                outside_limits[i] = True
+            elif self.has_uplim(i) and val > self.uplim(i):
+                outside_limits[i] = True
+                
+        # If any of the things outside the limits are fixed, this
+        # is a problem.  Complain.
+        fixed_and_outside = np.logical_and(self._fixed, outside_limits)
+        if fixed_and_outside.any():
+            badparams = \
+                ', '.join(self._parnames[fixed_and_outside.nonzero()[0]])
+            errmsg = "Some fixed parameters outside limits: %s"
+            raise ValueError(errmsg % badparams)
+                                  
+        # Adjust initial values if necessary.  We try to keep them
+        # close to the user provided value, just shifting into the
+        # range by a few sigma.  If the range is too small, just
+        # stick it in the middle.
+        # A fixed parameter that is out of range is a problem.
+        int_init = np.zeros(5)
+        for i in range(5):
+            if outside_limits[i]:
+                if self.has_uplim(i):
+                    par_range = self.uplim(i) - self.lowlim(i)
+                    if par_range <= 0:
+                        raise ValueError("Limits on parameter %d cross" % i)
+                    if 2.0 * initsigma[i] >= par_range:
+                        int_init[i] = self.lowlim(i) + 0.5 * par_range
+                    else:
+                        # Figure out if we are below or above
+                        if initvals[i] < self.lowlim(i):
+                            int_init[i] = self.lowlim(i) + 2 * initsigma[i]
+                        else:
+                            int_init[i] = self.uplim(i) - 2 * initsigma[i]
+                else:
+                    int_init[i] = self.lowlim(i) + 2 * initsigma[i]
+            else:
+                int_init[i] = initvals[i]
+                        
+        # Make p0 (output)
+        p0 = np.zeros((self._nwalkers, 5))
+        maxiters = 100
+        for i in range(5):
+            if self._fixed[i]:
+                p0[:,i] = int_init[i] * np.ones(self._nwalkers)
+            else:
+                lwlim = self.lowlim(i)
+                hs_uplim = self.has_uplim(i)
+                uplim = self.uplim(i)
+
+                pvec = initsigma[i] * np.random.randn(self._nwalkers) +\
+                    int_init[i]
+
+                # Now reject and regenerate anything outside limits
+                if hs_uplim:
+                    badidx = np.logical_or(pvec > uplim,
+                                           pvec < lwlim).nonzero()[0]
+                else:
+                    badidx = np.nonzero(pvec < lwlim)[0]
+                iters = 0
+                nbad = len(badidx)
+                while nbad > 0:
+                    pvec[badidx] = initsigma[i] * np.random.randn(nbad) + \
+                        int_init[i]
+                    iters += 1
+
+                    if hs_uplim:
+                        badidx = \
+                            np.logical_or(pvec > uplim,
+                                          pvec < lwlim).nonzero()[0]
+                    else:
+                        badidx = np.nonzero(pvec < lwlim)[0]
+                    nbad = len(badidx)
+
+                    if iters > maxiters:
+                        errmsg = "Too many iterations initializing param %d"
+                        raise Exception(errmsg % i)
+
+                p0[:,i] = pvec
+
+        return p0
+            
+
     def run(self, nburn, nsteps, p0, verbose=False):
         """Do emcee run.
 
@@ -665,6 +1006,19 @@ class mbb_fit(object):
         if not self.like.data_read:
             raise Exception("Data not read, needed to do fit")
 
+        # Make sure initial parameters are valid
+        for i in range(5):
+            # Don't test parameters we don't use
+            if i == 2 and self._opthin: continue
+            if i == 3 and self._noalpha: continue
+            # Limit check
+            if self.has_uplim(i) and p0[:,i].max() > self.uplim(i):
+                errmsg = "Upper limit initial value violation for %s"
+                raise ValueError(errmsg % self._parnames[i])
+            if p0[:,i].min() < self.lowlim(i):
+                errmsg = "Lower limit initial value violation for %s"
+                raise ValueError(errmsg % self._parnames[i])
+                
         # Do burn in
         self.sampler.reset()
         self._sampled = False
@@ -689,7 +1043,7 @@ class mbb_fit(object):
         if verbose:
             print "Fit complete"
             print " Mean acceptance fraction:", \
-                numpy.mean(self.sampler.acceptance_fraction)
+                np.mean(self.sampler.acceptance_fraction)
             try :
                 acor = self.sampler.acor
                 print " Autocorrelation time: "
@@ -709,7 +1063,7 @@ class mbb_fit(object):
         """ Find the wavelength of peak emission in microns from chain"""
 
         shp = self.sampler.chain.shape[0:2]
-        self.peaklambda = numpy.empty(shp, dtype=numpy.float)
+        self.peaklambda = np.empty(shp, dtype=np.float)
         for walkidx in range(shp[0]):
             # Do first step
             prevstep = self.sampler.chain[walkidx,0,:]
@@ -722,7 +1076,7 @@ class mbb_fit(object):
             #Now other steps
             for stepidx in range(1, shp[1]):
                 currstep = self.sampler.chain[walkidx,stepidx,:]
-                if numpy.allclose(prevstep, currstep):
+                if np.allclose(prevstep, currstep):
                     # Repeat, so avoid re-computation
                     self.peaklambda[walkidx, stepidx] = \
                         self.peaklambda[walkidx, stepidx-1]
@@ -768,8 +1122,8 @@ class mbb_fit(object):
             nel = shp[0] * shp[1]
             pool = multiprocessing.Pool(self._nthreads)
             rchain = self.sampler.chain.reshape(nel, npar)
-            lir = numpy.array(pool.map(integrator,
-                                       [rchain[i] for i in xrange(nel)]))
+            lir = np.array(pool.map(integrator,
+                                    [rchain[i] for i in xrange(nel)]))
             self.lir = lirprefac * lir.reshape((shp[0], shp[1]))
         else :
             # Explicitly check for repeats
@@ -777,7 +1131,7 @@ class mbb_fit(object):
             steps = shp[1]
             if not maxidx is None:
                 if maxidx < steps: steps = maxidx
-            self.lir = numpy.empty((shp[0],steps), dtype=numpy.float)
+            self.lir = np.empty((shp[0],steps), dtype=np.float)
             for walkidx in range(shp[0]):
                 # Do first step
                 prevstep = self.sampler.chain[walkidx,0,:]
@@ -785,7 +1139,7 @@ class mbb_fit(object):
                     lirprefac * integrator(prevstep)
                 for stepidx in range(1, steps):
                     currstep = self.sampler.chain[walkidx,stepidx,:]
-                    if numpy.allclose(prevstep, currstep):
+                    if np.allclose(prevstep, currstep):
                         # Repeat, so avoid re-computation
                         self.lir[walkidx, stepidx] =\
                             self.lir[walkidx, stepidx-1]
@@ -829,7 +1183,7 @@ class mbb_fit(object):
             nel = shp[0] * shp[1]
             pool = multiprocessing.Pool(self._nthreads)
             rchain = self.sampler.chain.reshape(nel, npar)
-            lagn = numpy.array(pool.map(integrator,
+            lagn = np.array(pool.map(integrator,
                                         [rchain[i] for i in xrange(nel)]))
             self.lagn = lagnprefac * lagn.reshape(shp[0], shp[1])
         else :
@@ -838,7 +1192,7 @@ class mbb_fit(object):
             steps = shp[1]
             if not maxidx is None:
                 if maxidx < steps: steps = maxidx
-            self.lagn = numpy.empty((shp[0],steps), dtype=numpy.float)
+            self.lagn = np.empty((shp[0],steps), dtype=np.float)
             for walkidx in range(shp[0]):
                 # Do first step
                 prevstep = self.sampler.chain[walkidx,0,:]
@@ -846,7 +1200,7 @@ class mbb_fit(object):
                     lagnprefac * integrator(prevstep)
                 for stepidx in range(1, steps):
                     currstep = self.sampler.chain[walkidx,stepidx,:]
-                    if numpy.allclose(prevstep, currstep):
+                    if np.allclose(prevstep, currstep):
                         # Repeat, so avoid re-computation
                         self.lagn[walkidx, stepidx] =\
                             self.lagn[walkidx, stepidx-1]
@@ -915,7 +1269,7 @@ class mbb_fit(object):
         steps = shp[1]
         if not maxidx is None:
             if maxidx < steps: steps = maxidx
-        self.dustmass = numpy.empty((shp[0],steps), dtype=numpy.float)
+        self.dustmass = np.empty((shp[0],steps), dtype=np.float)
         for walkidx in range(shp[0]):
             # Do first step
             prevstep = self.sampler.chain[walkidx,0,:]
@@ -924,7 +1278,7 @@ class mbb_fit(object):
                                                         self._opthin, dl2)
             for stepidx in range(1, steps):
                 currstep = self.sampler.chain[walkidx,0,:]
-                if numpy.allclose(prevstep, currstep):
+                if np.allclose(prevstep, currstep):
                     # Repeat, so avoid re-computation
                     self.dustmass[walkidx, stepidx] = \
                         self.dustmass[walkidx, stepidx-1]

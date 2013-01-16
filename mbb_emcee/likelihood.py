@@ -44,8 +44,7 @@ class likelihood(object) :
 
         # Set up information about fixed params, param limits, and
         # priors.
-        # Params are in the order T, beta, lambda0, alpha, fnorm
-        self._fixed = [False, False, False, False, False]
+
         # All parameters have lower limits
         # Make these small but slightly larger than 0, except
         # for T, which shouldn't get too small or odd things happen
@@ -63,6 +62,7 @@ class likelihood(object) :
         self._any_gprior = False
         self._has_gprior = [False, False, False, False, False]
         self._gprior_mean = np.zeros(5)
+        self._gprior_sigma = np.zeros(5)
         self._gprior_ivar = np.ones(5)
 
         # Data
@@ -82,6 +82,21 @@ class likelihood(object) :
         self._lowlim[4] = 1e-3 * self._flux.min()
 
         self._badval = float("-inf")
+
+    @property
+    def wavenorm(self):
+        """ Normalization wavelength in microns"""
+        return self._wavenorm
+
+    @property
+    def noalpha(self):
+        """ Not including a blue side power law?"""
+        return self._noalpha
+
+    @property
+    def opthin(self):
+        """ Assuming an optically thin model?"""
+        return self._opthin
 
     def set_phot(self, wave, flux, flux_unc):
         """ Sets photometry
@@ -275,44 +290,6 @@ class likelihood(object) :
         
         return self._param_order[paramname]
 
-    def fix_param(self, param):
-        """Fixes the specified parameter.
-
-        Parameters
-        ----------
-
-        param : int or string
-          Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
-          parameter.
-        """
-
-        if isinstance(param, str):
-            paramidx = self._param_order[param.lower()]
-        else:
-            paramidx = int(param)
-            
-        self._fixed[paramidx] = True
-
-    def unfix_param(self, param):
-        """Un-fixes the specified parameter.
-        
-        Parameters
-        ----------
-
-        param : int or string
-          Parameter specification. Either an index into
-          the parameter list, or a string name for the 
-          parameter.
-        """
-
-        if isinstance(param, str):
-            paramidx = self._param_order[param.lower()]
-        else:
-            paramidx = int(param)
-            
-        self._fixed[paramidx] = False
-
     def set_lowlim(self, param, val) :
         """Sets the specified parameter lower limit to value.
 
@@ -330,7 +307,7 @@ class likelihood(object) :
         else:
             self._lowlim[param] = val
 
-    def get_lowlim(self, param):
+    def lowlim(self, param):
         """Gets the specified parameter lower limit
 
         Parameters
@@ -349,7 +326,8 @@ class likelihood(object) :
             
         return self._lowlim[paramidx]
 
-    def get_lowlims(self):
+    @property
+    def lowlims(self):
         """ Get the list of lower parameter limits.
 
         Returns
@@ -382,6 +360,54 @@ class likelihood(object) :
         self._has_uplim[paramidx] = True
         self._uplim[paramidx] = val
 
+    def has_uplim(self, param):
+        """ Does the likelihood have an upper limit for a given parameter?
+
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification.  Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+
+        Returns
+        -------
+        val : bool
+          True if there is an upper limit, false otherwise
+        """
+        if isinstance(param, str):
+            paramidx = self._param_order[param.lower()]
+        else:
+            paramidx = int(param)
+        
+        return self._has_uplim[paramidx]
+
+    def uplim(self, param):
+        """ What is the upper limit for a given parameter?
+
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification.  Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+
+        Returns
+        -------
+        val : float
+          Upper limit, or None if there isn't one
+        """
+        if isinstance(param, str):
+            paramidx = self._param_order[param.lower()]
+        else:
+            paramidx = int(param)
+        
+        if not self._has_uplim[paramidx]: return None
+        return self._uplim[paramidx]
+
+
     def set_gaussian_prior(self, param, mean, sigma):
         """Sets up a Gaussian prior on the specified parameter.
 
@@ -408,7 +434,59 @@ class likelihood(object) :
         self._any_gprior = True
         self._has_gprior[paramidx] = True
         self._gprior_mean[paramidx] = float(mean)
+        self._gprior_sigma = float(sigma)
         self._gprior_ivar[paramidx] = 1.0 / (float(sigma)**2)
+
+    def has_gaussian_prior(self, param):
+        """ Does the given parameter have a Gaussian prior set?
+
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification.  Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+          
+        Returns
+        -------
+        has_prior : bool
+          True if a Gaussian prior is set, False otherwise
+        """
+        
+        if isinstance(param, str):
+            paramidx = self._param_order[param.lower()]
+        else:
+            paramidx = int(param)
+
+        return self._has_gprior[paramidx]
+
+    def get_gaussian_prior(self, param):
+        """ Return Gaussian prior values
+
+        Parameters
+        ----------
+
+        param : int or string
+          Parameter specification.  Either an index into
+          the parameter list, or a string name for the 
+          parameter.
+          
+        Returns
+        -------
+        tup : tuple or None
+          Mean, variance if set, None otherwise
+        """
+        
+        if not self._any_gprior: return None
+
+        if isinstance(param, str):
+            paramidx = self._param_order[param.lower()]
+        else:
+            paramidx = int(param)
+            
+        if not self._has_gprior[paramidx]: return None
+        return (self._gprior_mean[paramidx], self._gprior_sigma[paramidx])
 
 
     def _check_lowlim(self,pars) :
@@ -435,9 +513,8 @@ class likelihood(object) :
             raise ValueError("pars is not of expected length 5")
 
         for idx, val in enumerate(pars):
-            if not self._fixed[idx]:
-                if val < self._lowlim[idx]:
-                    return False
+            if val < self._lowlim[idx]:
+                return False
 
         return True
 
@@ -468,7 +545,7 @@ class likelihood(object) :
 
         logpenalty = 0.0
         for idx, val in enumerate(pars):
-            if not self._fixed[idx] and self._has_uplim[idx]:
+            if self._has_uplim[idx]:
                 lim = self._uplim[idx]
                 if val > lim:
                     limvar = (1e-2*lim)**2
@@ -477,7 +554,7 @@ class likelihood(object) :
         return logpenalty
 
     def _set_sed(self, pars):
-        """Set up the SED for the provided parameters
+        """ Set up the SED for the provided parameters
 
         Parameters
         ----------
@@ -493,8 +570,8 @@ class likelihood(object) :
                                        opthin=self._opthin)
         
 
-    def get_sed(self, pars, wave) :
-        """Get the model SED at the specified wavelengths for a set of params.
+    def get_sed(self, pars, wave):
+        """ Get the model SED at the specified wavelengths for a set of params.
 
         Parameters
         ----------
@@ -513,8 +590,9 @@ class likelihood(object) :
         self._set_sed(pars)
         return self._sed(wave)
 
+
     def __call__(self, pars) :
-        """Gets log likelihood of the parameters.
+        """ Gets log likelihood of the parameters.
 
         Parameters
         ----------

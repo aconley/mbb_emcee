@@ -141,7 +141,7 @@ if __name__ == "__main__":
     parser.add_argument("-v","--verbose",action="store_true",default=False,
                         help="Print status messages")
     parser.add_argument('-V','--version',action='version',
-                        version='%(prog)s 0.1.2')
+                        version='%(prog)s 0.1.3')
     parser.add_argument('-w','--wavenorm',action='store', 
                         type=float, default=500.0,
                         help="Observer frame wavelength of normalization (def: 500)")
@@ -178,81 +178,63 @@ if __name__ == "__main__":
                   nthreads=parse_results.threads) 
     
     # Set parameters fixed/limits if present
-    if parse_results.fixT: fit.like.fix_param(0)
-    if parse_results.fixBeta: fit.like.fix_param(1)
-    if parse_results.fixLambda0: fit.like.fix_param(2)
+    if parse_results.fixT: fit.fix_param('T')
+    if parse_results.fixBeta: fit.fix_param('beta')
+    if parse_results.fixLambda0: fit.fix_param('lambda0')
     if parse_results.noalpha or parse_results.fixAlpha:
-        fit.like.fix_param(3)
-        if parse_results.fixFnorm: fit.like.fix_param(4)
+        fit.fix_param('alpha')
+    if parse_results.fixFnorm: fit.fix_param('fnorm')
         
     # Lower limits
     if not parse_results.lowT is None: 
-        fit.like.set_lowlim('T',parse_results.lowT)
+        fit.set_lowlim('T',parse_results.lowT)
     if not parse_results.lowBeta is None: 
-        fit.like.set_lowlim('beta',parse_results.lowBeta)
+        fit.set_lowlim('beta',parse_results.lowBeta)
     if (not parse_results.opthin) and (not parse_results.lowLambda0 is None): 
-        fit.like.set_lowlim('lambda0',parse_results.lowLambda0)
+        fit.set_lowlim('lambda0',parse_results.lowLambda0)
     if (not parse_results.noalpha) and (not parse_results.lowAlpha is None): 
-        fit.like.set_lowlim('alpha',parse_results.lowAlpha)
+        fit.set_lowlim('alpha',parse_results.lowAlpha)
     if not parse_results.lowFnorm is None: 
-        fit.like.set_lowlim('fnorm',parse_results.lowFnorm)
+        fit.set_lowlim('fnorm',parse_results.lowFnorm)
 
     # Upper Limits
     if not parse_results.upT is None: 
-        fit.like.set_uplim('T',parse_results.upT)
+        fit.set_uplim('T',parse_results.upT)
     if not parse_results.upBeta is None : 
-        fit.like.set_uplim('beta',parse_results.upBeta)
+        fit.set_uplim('beta',parse_results.upBeta)
     if (not parse_results.opthin) and (not parse_results.upLambda0 is None): 
-        fit.like.set_uplim('lambda0',parse_results.upLambda0)
+        fit.set_uplim('lambda0',parse_results.upLambda0)
     if (not parse_results.noalpha) and (not parse_results.upAlpha is None): 
-        fit.like.set_uplim('alpha',parse_results.upAlpha)
+        fit.set_uplim('alpha',parse_results.upAlpha)
     if not parse_results.upFnorm is None : 
-        fit.like.set_uplim('fnorm',parse_results.upFnorm)
+        fit.set_uplim('fnorm',parse_results.upFnorm)
 
     # Priors
     if not parse_results.priorT is None:
-        fit.like.set_gaussian_prior(0, parse_results.priorT[0], 
-                                    parse_results.priorT[1])
+        fit.set_gaussian_prior('T', parse_results.priorT[0], 
+                               parse_results.priorT[1])
     if not parse_results.priorBeta is None:
-        fit.like.set_gaussian_prior(1, parse_results.priorBeta[0],
-                                    parse_results.priorBeta[1])
+        fit.set_gaussian_prior('Beta', parse_results.priorBeta[0],
+                               parse_results.priorBeta[1])
     if (not parse_results.opthin) and (not parse_results.priorLambda0 is None):
-        fit.like.set_gaussian_prior(2, parse_results.priorLambda0[0], 
-                                    parse_results.priorLambda0[1])
+        fit.set_gaussian_prior('Lambda0', parse_results.priorLambda0[0], 
+                               parse_results.priorLambda0[1])
     if (not parse_results.noalpha) and (not parse_results.priorAlpha is None):
-        fit.like.set_gaussian_prior(3, parse_results.priorAlpha[0], 
-                                    parse_results.priorAlpha[1])
+        fit.set_gaussian_prior('Alpha', parse_results.priorAlpha[0], 
+                               parse_results.priorAlpha[1])
     if not parse_results.priorFnorm is None:
-        fit.like.set_gaussian_prior(4, parse_results.priorFnorm[0], 
-                                    parse_results.priorFnorm[1])
+        fit.set_gaussian_prior('Fnorm', parse_results.priorFnorm[0], 
+                               parse_results.priorFnorm[1])
 
 
     # initial values -- T, beta, lambda0, alpha, fnorm
-    # Should add way for user to specify these
-    p0mn  = numpy.array([parse_results.initT, parse_results.initBeta, 
-                         parse_results.initLambda0, parse_results.initAlpha,
-                         parse_results.initFnorm])
-    p0var = numpy.array([2, 0.2, 100, 0.3, 5.0])
-    if parse_results.fixT:
-        p0var[0] = 0.0
-    if parse_results.fixBeta:
-        p0var[1] = 0.0
-    if parse_results.opthin or parse_results.fixLambda0:
-        p0var[2] = 0.0
-    if parse_results.noalpha or parse_results.fixAlpha:
-        p0var[3] = 0.0
-    if parse_results.fixFnorm:
-        p0var[4] = 0.0
+    p0init  = numpy.array([parse_results.initT, parse_results.initBeta, 
+                           parse_results.initLambda0, parse_results.initAlpha,
+                           parse_results.initFnorm])
+    p0sig = numpy.array([2, 0.2, 100, 0.3, 5.0])
 
-    # We have to ensure all the initial values fall above the lower
-    # limits
-    p0 = []
-    lowarr = fit.like._lowlim
-    for i in range(nwalkers):
-        pval = numpy.random.randn(npar) * p0var + p0mn
-        badidx = pval < lowarr
-        pval[badidx] = lowarr[badidx]
-        p0.append(pval)
+    # Generate initial values; this will make sure they are within limits
+    p0 = fit.generate_initial_values(p0init, p0sig)
 
     # Do fit
     fit.run(parse_results.burn, parse_results.nsteps, p0, parse_results.verbose)
