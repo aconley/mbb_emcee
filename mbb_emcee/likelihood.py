@@ -112,6 +112,10 @@ class likelihood(object) :
 
         flux_unc : array like
           Array of flux density uncertainties, in mJy
+        
+        Notes
+        -----
+        This wipes out any covariance matrix already present.
         """
 
         self._wave = np.asarray(wave)
@@ -135,6 +139,7 @@ class likelihood(object) :
             self._uplim[2] = 5.0 * self._wave.max()
 
         self._data_read = True
+        self._has_covmatrix = False
 
     def read_phot(self, filename) :
         """Reads in the photometry file
@@ -146,12 +151,19 @@ class likelihood(object) :
           Name of file to read input from.  This file should have
           three columns: the wavelength [microns], the flux density
           [mJy], and the uncertainty in the flux density [mJy].
+
+        Notes
+        -----
+        This wipes out any covariance matrix present
         """
 
         import astropy.io.ascii
+
         if not isinstance(filename, basestring):
             raise TypeError("filename must be string-like")
+
         data = astropy.io.ascii.read(filename,comment='^#')
+
         if len(data) == 0 :
             errstr = "No data read from %s" % filename
             raise IOError(errstr)
@@ -199,7 +211,7 @@ class likelihood(object) :
 
         if self._data_read:
             if self._has_covmatrix:
-                return numpy.sqrt(numpy.diag(self._covmatrix))
+                return np.sqrt(np.diag(self._covmatrix))
             else:
                 return self._flux_unc
         else:
@@ -536,7 +548,7 @@ class likelihood(object) :
         Notes
         -----
         For values above the upper limit, applies a Gaussian
-        penalty centered at the limit with sigma = limit/100.0.
+        penalty centered at the limit with sigma = limit range/50.0.
         A soft upper limit seems to work better than a hard one.
         """
 
@@ -548,7 +560,7 @@ class likelihood(object) :
             if self._has_uplim[idx]:
                 lim = self._uplim[idx]
                 if val > lim:
-                    limvar = (1e-2*lim)**2
+                    limvar = (0.02 * (lim - self._lowlim[idx]))**2
                     logpenalty -= 0.5*(val - lim)**2 / limvar
 
         return logpenalty
