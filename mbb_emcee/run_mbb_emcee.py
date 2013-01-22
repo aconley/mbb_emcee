@@ -239,7 +239,8 @@ if __name__ == "__main__":
     p0 = fit.generate_initial_values(p0init, p0sig)
 
     # Do fit
-    fit.run(parse_results.burn, parse_results.nsteps, p0, parse_results.verbose)
+    fit.run(parse_results.burn, parse_results.nsteps, p0, 
+            verbose=parse_results.verbose)
 
     # Peak wavelength computation
     if parse_results.get_peaklambda:

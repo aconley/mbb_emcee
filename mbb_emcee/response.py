@@ -1,7 +1,7 @@
 import math
-import numpy as np
+import numpy
 
-"""Astronomical instrument response modelling"""
+"""Astronomical instrument response modeling"""
 
 __all__ = ["response", "response_set"]
 
@@ -37,7 +37,8 @@ class response(object):
     """
 
     def __init__(self, inputfile, xtype='wave', xunits='microns',
-                 normtype = 'power', xnorm=250.0, normparam=-1.0):
+                 normtype = 'power', xnorm=250.0, normparam=-1.0,
+                 filtdir=None):
         """ Read in the input file and set up the normalization
 
         Parameters
@@ -53,7 +54,8 @@ class response(object):
           wavelength, hz, mhz, ghz, thz for frequency.
         
         normtype : string
-          Type of normalization.  power for power-law, bb for blackbody.
+          Type of normalization.  power for power-law, bb for blackbody, flat
+          for flat fnu, delta for delta function, none for no normalization, etc..
 
         xnorm : float
            X value of normalization, same units as input x value.
@@ -61,17 +63,71 @@ class response(object):
         normparam : float
           Normalizatin parameter -- power low exponent for power-law,
           temperature for blackbody
+    
+        Notes
+        -----
+        If normtype is delta, then the filter function is assumed to be a delta
+        function at xnorm, and no filter file is read.
         """
 
         import astropy.io.ascii
-        
+        import os.path
+
+        # Make sure all args have right case
+        ntype = normtype.lower()
+        xtyp = xtype.lower()
+        xun = xunits.lower()
+
+        #Delta functions are a special case
+        if ntype == "delta":
+            # Quick, special return
+            if xnorm <= 0:
+                raise ValueError("Non-positive xnorm")
+            if xtyp == 'wave':
+                if xun == 'angstroms':
+                    self._normwave = 1e-4 * xnorm
+                elif xun == 'microns':
+                    self._normwave = xnorm
+                elif xun == 'meters':
+                    self._normwave = 1e6 * xnorm
+                else:
+                    raise ValueError("Unrecognized wavelength type %s" % xtype)
+                self._normfreq = 299792458e-3 / self._normwave
+            elif xtyp == 'freq':
+                # Change to GHz
+                if xun == 'hz':
+                    self._normfreq = 1e-9 * xnorm
+                elif xun == 'mhz':
+                    self._normfreq = 1e-3 * xnorm
+                elif xun == 'ghz':
+                    self._normfreq = xnorm
+                elif xun == 'thz':
+                    self._normfreq = 1e3 * xnorm
+                self._normwave = 299792458e-3 / self._normfreq
+            self._isdelta = True
+            self._resp = numpy.array([1.0])
+            self._nresp = 1
+            self._normtype = "delta"
+            self._normparam = None
+            self._normfac = 1.0
+
+            return
+
+        #Read in data
         if not isinstance(inputfile, basestring):
             raise TypeError("filename must be string-like")
         
-        data = astropy.io.ascii.read(inputfile, comment='^#')
-        if len(data) == 0 :
-            raise IOError("No data read from %s" % inputfile)
+        if filtdir is None:
+            data = astropy.io.ascii.read(inputfile, comment='^#')
+            if len(data) == 0 :
+                raise IOError("No data read from %s" % inputfile)
+        else:
+            infile = os.path.join(filtdir, inputfile)
+            data = astropy.io.ascii.read(infile, comment='^#')
+            if len(data) == 0 :
+                raise IOError("No data read from %s" % infile)
 
+        self._isdelta = False
         xvals = numpy.asarray([dat[0] for dat in data])
         self._resp = numpy.asarray([dat[1] for dat in data])
 
@@ -84,8 +140,7 @@ class response(object):
             raise ValueError("Non-positive xnorm")
 
         #Build up wavelength/normwave in microns, freq in GHz
-        xtyp = xtype.lower()
-        xun = xunits.lower()
+
         if xtyp == 'wave':
             if xun == 'angstroms':
                 self._wave = 1e-4 * xvals
@@ -128,34 +183,41 @@ class response(object):
         # the response times the delta freq factor to sum over
         # Note that integrations will be done in frequency always.
         # Since freq is in reverse order, these will be negative
-        self._dnu = self._freq[1:self._nresp] - self._freq[0:self._nresp-2]
-        self._sedmult = np.zeros(self._nresp)
+        self._dnu = self._freq[1:self._nresp] - self._freq[0:self._nresp-1]
+        self._sedmult = numpy.empty(self._nresp)
         self._sedmult[0:self._nresp-1] = 0.5 * self._dnu
-        self._sedmult[self._nresp-1] = 0.5 * self._dnu[self._nresp-1]
+        self._sedmult[self._nresp-1] = 0.5 * self._dnu[self._nresp-2]
         self._sedmult[1:self._nresp-1] += 0.5 * self._dnu[0:self._nresp-2]
         self._sedmult *= self._resp
 
         #And, now the normalization condition
-
-        ntype = normtype.lower()
-        if ntype == "power":
-            sed = (self._freq / self._normfreq)**normparam
-        elif ntype == "bb":
-            # Rather more complicated
-            nrmpar = float(normparam)
-            if nrmpar <= 0.0:
-                errmsg = "Invalid (non-positive) blackbody temperature %f"
-                raise ValueError(errmsg % nrmpar)
-            # Blackbody curve, normalized at normfreq
-            sed = response_bb(self._freq, nrmpar) /\
-                response_bb(self._normfreq, nrmpar)
+        self._normtype = ntype
+        if ntype == "none":
+            self._normparam = None
+            self._normfac = -1.0
         else:
-            raise ValueError("Unknown normalization type %s" % normtype)
+            if ntype == "power":
+                self._normparam = float(normparam)
+                sed = (self._freq / self._normfreq)**self._normparam
+            elif ntype == "flat":
+                sed = numpy.ones(self._nresp)
+                self._normparam = None
+            elif ntype == "bb":
+                # Rather more complicated
+                self._normparam = float(normparam)
+                if self._normparam <= 0.0:
+                    errmsg = "Invalid (non-positive) blackbody temperature %f"
+                    raise ValueError(errmsg % self._normparam)
+                # Blackbody curve, normalized at normfreq
+                sed = response_bb(self._freq, self._normparam) /\
+                    response_bb(self._normfreq, self._normparam)
+            else:
+                raise ValueError("Unknown normalization type %s" % normtype)
 
-        # Note this will be negative due to the frequency ordering,
-        # but that's okay because our normal integrals will be negative
-        # as well so when we divide them it will all work out.
-        self._normfac = (sed * self._stepmult).sum()
+            # Note this will be negative due to the frequency ordering,
+            # but that's okay because our normal integrals will be negative
+            # as well so when we divide them it will all work out.
+            self._normfac = 1.0 / (sed * self._sedmult).sum()
 
     @property
     def wavelength(self):
@@ -197,18 +259,23 @@ class response(object):
           Instrument response, including pipeline normalization convention.
         """
         
-        if freq is False:
-            # Wavelength units
-            return (fnufunc(self._wave) * self._stepmult).sum() / self._normfac
+        if self._isdelta:
+            if freq:
+                return fnufunc(self._normfreq)
+            else:
+                return fnufunc(self._normwave)
         else:
-            # Frequency
-            return (fnufunc(self._freq) * self._stepmult).sum() / self._normfac
-
+            if freq:
+                return (fnufunc(self._freq) * self._sedmult).sum() *\
+                    self._normfac
+            else:
+                return (fnufunc(self._wave) * self._sedmult).sum() *\
+                    self._normfac
 
 class response_set(object):
     """ A set of instrument responses"""
     
-    def __init__(self, inputfile):
+    def __init__(self, inputfile, filtdir=None):
         """ Initialize response set.
 
         Parameters
@@ -226,12 +293,13 @@ class response_set(object):
         if len(data) == 0 :
             raise IOError("No data read from %s" % inputfile)
 
-        self._reponses = {}
+        self._responses = {}
         for dat in data:
             name = dat[0]
             self._responses[name] = response(dat[1], dat[2].lower(),
                                              dat[3].lower(), dat[4].lower(),
-                                             float(dat[5]), float(dat[6]))
+                                             float(dat[5]), float(dat[6]),
+                                             filtdir=filtdir)
 
     def __getitem__(self, name):
         """ Get response with a specified name
@@ -247,3 +315,44 @@ class response_set(object):
           Class object giving response function.
         """
         return self._responses[name]
+
+    def setitem(self, val):
+        if not isinstance(val, response):
+            raise ValueError("Val not of type mbb_emcee.response")
+        return self._responses.setitem(val)
+
+    def keys(self):
+        return self._responses.keys()
+
+    def viewkeys(self):
+        return self._responses.viewkeys()
+
+    def has_key(self, val):
+        return self._responses.has_key(val)
+
+    def iterkeys(self):
+        return self._responses.iterkeys()
+
+    def items(self):
+        return self._responses.items()
+
+    def iteritems(self):
+        return self._responses.iteritems()
+
+    def viewitems(self):
+        return self._responses.viewitems()
+
+    def viewvalues(self):
+        return self._responses.viewvalues()
+
+    def itervalues(self):
+        return self._responses.itervalues()
+
+    def contains(self, val):
+        return self._responses.contains(val)
+
+    def delitem(self, val):
+        return self._responses.delitem(val)
+
+    def clear(self):
+        return self._respones.clear()
