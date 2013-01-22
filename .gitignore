@@ -4,10 +4,10 @@
 *.so
 
 #temp files
-modified_blackbody_emcee/#*
-modified_blackbody_emcee/.#*
+mbb_emcee/#*
+mbb_emcee/.#*
 *~
-modified_blackbody_emcee/*~
+mbb_blackbody_emcee/*~
 
 # Packages
 *.egg

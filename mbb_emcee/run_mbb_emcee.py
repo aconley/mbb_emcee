@@ -143,7 +143,7 @@ if __name__ == "__main__":
     parser.add_argument("-v","--verbose",action="store_true",default=False,
                         help="Print status messages")
     parser.add_argument('-V','--version',action='version',
-                        version='%(prog)s 0.1.3')
+                        version='%(prog)s 0.1.4')
     parser.add_argument('-w','--wavenorm',action='store', 
                         type=float, default=500.0,
                         help="Observer frame wavelength of normalization (def: 500)")
