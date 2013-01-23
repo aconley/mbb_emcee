@@ -47,6 +47,14 @@ if __name__ == "__main__":
       values frequently cause overflows.  Lambda0 has an upper limit of
       10 times the longest wavelength data point.  The user can override
       all these limits, but not turn them off.
+
+
+     By default the instrument responses are modeled as delta functions
+     at the wavelengths in photfile.  However, if --responsefile is given,
+     then the names of the response functions in the photfile, coupled with
+     the actual responses as specified in the response file, are used to
+     fully include the instrumental responses.  This will slow down the code
+     significantly.
      ''')
 
     parser = argparse.ArgumentParser(description=desc, epilog=epi,
@@ -128,6 +136,10 @@ if __name__ == "__main__":
                         default=None,help="Mean and sigma of Alpha prior")
     parser.add_argument('--priorFnorm',action="store",nargs=2,type=float,
                         default=None,help="Mean and sigma of fnorm prior")
+    parser.add_argument('-r', '--responsefile', action="store", default=None,
+                        help="Response specification file")
+    parser.add_argument('--responsedir', action="store", default=None,
+                        help="Response specification directory")
     parser.add_argument('-t','--threads',action='store',type=int,default=1,
                         help="Number of threads to use (Def: 1)")
     parser.add_argument("--upT",action='store',type=float,default=None,
@@ -177,7 +189,9 @@ if __name__ == "__main__":
                   wavenorm=parse_results.wavenorm, 
                   noalpha=parse_results.noalpha,
                   opthin=parse_results.opthin, 
-                  nthreads=parse_results.threads) 
+                  nthreads=parse_results.threads,
+                  responsefile=parse_results.responsefile,
+                  responsedir=parse_results.responsedir) 
     
     # Set parameters fixed/limits if present
     if parse_results.fixT: fit.fix_param('T')

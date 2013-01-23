@@ -5,9 +5,115 @@ from scipy.special import lambertw
 
 from utility import isiterable
 
-"""Modified blackbody SED"""
+"""Modified blackbody and blackbody SEDs"""
 
-__all__ = ["modified_blackbody"]
+__all__ = ["modified_blackbody", "blackbody"]
+
+class blackbody(object):
+    """A class representing a Blackbody"""
+
+    def __init__(self, T, fnorm, wavenorm=500.0):
+        """Initializer
+
+        Parameters:
+        -----------
+        T : float
+          Temperature/(1+z) in K
+        
+        fnorm : float
+          Normalization flux, in mJy
+
+        wavenorm : float
+          Wavelength of normalization flux, in microns (def: 500)
+        """
+
+        self._T = float(T)
+        self._fnorm = float(fnorm)
+        self._wavenorm = float(wavenorm)
+
+        # Some constants -- eventually, replace these with
+        # astropy.constants, but that is in development, so hardwire 
+        # for now
+        c = 299792458e6 #in microns
+        h = 6.6260693e-34 #J/s
+        k = 1.3806505e-23 #J/K
+        self._hcokt = h * c / (k * self._T)
+        self._xnorm = self._hcokt / self._wavenorm
+        self._normfac = self._fnorm * math.expm1(self._xnorm) / \
+            self._xnorm**3
+
+    @property
+    def T(self):
+        """ Get temperature / (1+z) in K"""
+        return self._T
+
+    @property
+    def fnorm(self):
+        """ Get normalization flux at wavenorm in mJy"""
+        return self._fnorm
+
+    @property
+    def wavenorm(self):
+        """ Get normalization flux wavelength in microns"""
+        return self._wavenorm
+
+    def __repr__(self):
+        retstr = "blackbody(%.2g, %.2g, wavenorm=%.2g)"
+        return retstr % (self._T, self._fnorm, self._wavenorm)
+
+    def __str__(self):
+        retstr = "blackbody(T: %.2g fnorm: %.2g wavenorm: %.2g)"
+        return retstr % (self._T, self._fnorm, self._wavenorm)
+
+    def f_nu(self, freq):
+        """Evaluate blackbody at specified frequencies.
+
+        Parameters
+        ----------
+        freq : array_like
+          Input frequencies, in GHz
+
+        Returns
+        -------
+        fnu : ndarray, or float if input scalar
+          The flux density in mJy
+        """
+
+        # Convert to some form of numarray
+        if not isiterable(freq):
+            frequency = numpy.asarray([freq], dtype=numpy.float)
+        else:
+            frequency = numpy.asanyarray(freq, dtype=numpy.float)
+
+        # Some constants
+        h = 6.6260693e-34 #J/s
+        k = 1.3806505e-23 #J/K
+        hokt = h / (k * self._T)
+
+        # Convert wavelengths to x = h nu / k T
+        x = hokt * 1e9 * frequency  #1e9 to convert to Hz from GHz
+        return self._normfac * x**3.0 / numpy.expm1(x)
+
+    def __call__(self, wave):
+        """ Evaluate modified blackbody at specified wavelengths
+
+        Parameters
+        ----------
+        wave : array_like
+          Input wavelengths, in microns
+
+        Returns
+        -------
+        fnu : ndarray, or float if input scalar
+          The flux density in mJy
+        """
+        c = 299792458e-3 #The microns to GHz conversion
+        wviter = isiterable(wave)
+        if wviter:
+            wave = numpy.asanyarray(wave, dtype=numpy.float)
+            return self.f_nu(c / wave)
+        else:
+            return self.f_nu(c / float(wave))
 
 def alpha_merge_eqn(x, alpha, beta, x0, opthin=False):
     """Equation we need the root for to merge power law to modified
@@ -113,7 +219,8 @@ class modified_blackbody(object):
             errmsg = "beta must be non-negative.  You gave: %.5g" % self._beta
             raise ValueError(errmsg)
 
-        # Some constants
+        # Some constants -- eventually, replace these with
+        # astropy.constants, but that is in development, so hardwire for now
         c = 299792458e6 #in microns
         h = 6.6260693e-34 #J/s
         k = 1.3806505e-23 #J/K
@@ -243,7 +350,7 @@ class modified_blackbody(object):
     @property
     def alpha(self):
         """ Get alpha"""
-        if self._noalpha: return None
+        if not self._hasalpha: return None
         return self._alpha
     
     @property
@@ -278,47 +385,51 @@ class modified_blackbody(object):
         if self._hasalpha:
             if self._opthin:
                 retstr = "modified_blackbody(%.2g, %.2g, None, %.2g, %.2g," + \
-                    " opthin=True)"
+                    " opthin=True, wavenorm=%.2g)"
                 return retstr % (self._T, self._beta, self._alpha,
-                                 self._fnorm)
+                                 self._fnorm, self._wavenorm)
             else:
                 retstr = "modified_blackbody(%.2g, %.2g, %.2g, %.2g, %.2g," + \
-                    " opthin=True)"
+                    " wavenorm=%.2g)"
                 return retstr % (self._T, self._beta, self.lambda0,
-                                 self.alpha, self._fnorm)
+                                 self.alpha, self._fnorm, self._wavenorm)
         else:
             if self._opthin:
                 retstr = "modified_blackbody(%.2g, %.2g, None, None, %.2g," + \
-                    " noalpha=True, opthin=True)"
-                return retstr % (self._T, self._beta, self._fnorm)
+                    " noalpha=True, opthin=True, wavenorm=%.2g)"
+                return retstr % (self._T, self._beta, self._fnorm,
+                                 self._wavenorm)
             else:
                 retstr = "modified_blackbody(%.2g, %.2g, %.2g, None, %.2g," + \
-                    " noalpha=True)"
+                    " noalpha=True, wavenorm=%.2g)"
                 return retstr % (self._T, self._beta, self.lambda0,
-                                 self._fnorm)
+                                 self._fnorm, self._wavenorm)
 
 
     def __str__(self):
         if self._hasalpha:
             if self._opthin:
                 retstr = "modified_blackbody(T: %.2g beta: %.2g " + \
-                    "alpha: %.2g fnorm: %.2g)"
+                    "alpha: %.2g fnorm: %.2g wavenorm: %.2g)"
                 return retstr % (self._T, self._beta, self._alpha,
-                                 self._fnorm)
+                                 self._fnorm, self._wavenorm)
             else:
                 retstr = "modified_blackbody(T: %.2g beta: %.2g " + \
-                    "lambda0: %.2g alpha: %.2g fnorm: %.2g)"
+                    "lambda0: %.2g alpha: %.2g fnorm: %.2g wavenorm: %.2g)"
                 return retstr % (self._T, self._beta, self.lambda0,
-                                 self._alpha, self._fnorm)
+                                 self._alpha, self._fnorm,
+                                 self._wavenorm)
         else:
             if self._opthin:
-                retstr = "modified_blackbody(T: %.2g beta: %.2g fnorm: %.2g)"
-                return retstr % (self._T, self._beta, self._fnorm)
+                retstr = "modified_blackbody(T: %.2g beta: %.2g " +\
+                    "fnorm: %.2g  wavenorm: %.2g)"
+                return retstr % (self._T, self._beta, self._fnorm,
+                                 self._wavenorm)
             else:
                 retstr = "modified_blackbody(T: %.2g beta: %.2g " + \
-                    "lambda0: %.2g fnorm: %.2g)"
+                    "lambda0: %.2g fnorm: %.2g  wavenorm: %.2g)"
                 return retstr % (self._T, self._beta, self.lambda0,
-                                 self._fnorm)  
+                                 self._fnorm, self._wavenorm)  
 
     def f_nu(self, freq):
         """Evaluate modifed blackbody at specified frequencies.

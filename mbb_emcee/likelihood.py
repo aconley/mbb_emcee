@@ -1,6 +1,7 @@
 import numpy as np
 import math
 from modified_blackbody import modified_blackbody
+from response import response, response_set
 import astropy.cosmology
 
 __all__ = ["likelihood"]
@@ -14,7 +15,8 @@ class likelihood(object) :
                     'alpha': 3, 'fnorm': 4}
 
     def __init__(self, photfile=None, covfile=None, covextn=0, 
-                 wavenorm=500.0, noalpha=False, opthin=False) :
+                 wavenorm=500.0, noalpha=False, opthin=False,
+                 responsefile=None, responsedir=None) :
         """ Object for computing likelihood of a given set of parameters.
 
         Parameters
@@ -36,6 +38,13 @@ class likelihood(object) :
 
         opthin : bool
            Assume optically thin
+
+        responsefile : string
+           Name of file containing response specifications.  If set,
+           response integration is used in the fitting.
+
+        responsedir : string
+           Directory to look for response files in.
         """
 
         self._wavenorm = float(wavenorm)
@@ -65,7 +74,14 @@ class likelihood(object) :
         self._gprior_sigma = np.zeros(5)
         self._gprior_ivar = np.ones(5)
 
+        # Responses
+        self._response_integrate = False
+        if not responsefile is None:
+            self.read_responses(responsefile, responsedir=responsedir)
+
         # Data
+        self._data_read = False
+        self._has_covmatrix = False
         if not photfile is None:
             self.read_phot(photfile)
             if not covfile is None :
@@ -75,8 +91,6 @@ class likelihood(object) :
         else:
             if not covfile is None:
                 raise Exception("Can't pass in covfile if no photfile")
-            self._data_read = False
-            self._has_covmatrix = False
 
         # Reset normalization flux lower limit based on data
         self._lowlim[4] = 1e-3 * self._flux.min()
@@ -98,14 +112,39 @@ class likelihood(object) :
         """ Assuming an optically thin model?"""
         return self._opthin
 
-    def set_phot(self, wave, flux, flux_unc):
+    @property
+    def response_integrate(self):
+        """Is filter integration being used?"""
+        return self._response_integrate
+        
+    def read_responses(self, responsefile, responsedir=None):
+        """ Read in responses
+
+        Parameters
+        ----------
+        responsefile : string
+          File containing filter specification information.
+
+        responsedir : string
+          Directory to look for actual responses in.
+          
+        Notes
+        -----
+        Calling this turns on filter integration
+        """
+        self._responsewheel = response_set(responsefile, dir=responsedir)
+        self._response_integrate = True
+
+
+    def set_phot(self, firstarg, flux, flux_unc):
         """ Sets photometry
 
         Parameters
         ----------
 
-        wave : array like
-          Array of wavelengths, in microns
+        firstarg : array like
+          If using response integration, a string array of response names.
+          Otherwise, an array of wavelengths, in microns
 
         flux : array like
           Array of flux densities, in mJy
@@ -115,13 +154,29 @@ class likelihood(object) :
         
         Notes
         -----
-        This wipes out any covariance matrix already present.
+        This wipes out any covariance matrix already present,
+        and turns off response integration
         """
 
-        self._wave = np.asarray(wave)
-        self._ndata = len(self._wave) 
-        if self._ndata == 0:
-            raise ValueError("No elements in wavelength vector")
+        if self._response_integrate:
+            # Get filter responses in same order as photometry
+            if not isinstance(firstarg[0], basestring):
+                raise ValueError("Expecting response string name")
+            self._responses = []
+            for name in firstarg:
+                # Do it this way to provide a more helpful error message
+                # if name is not known
+                if not self._responsewheel.has_key(name):
+                    raise ValueError("Unknown filter response %s" % name)
+                self._responses.append(self._responsewheel[name])
+
+            self._response_names = [r.name for r in self._responses]
+            self._wave = [resp.effective_wavelength for resp in self._responses]
+        else:
+            self._wave = np.asarray(firstarg, dtype=np.float64)
+            self._ndata = len(self._wave) 
+            if self._ndata == 0:
+                raise ValueError("No elements in wavelength vector")
 
         self._flux = np.asarray(flux)
         self._flux_unc = np.asarray(flux_unc)
@@ -141,12 +196,12 @@ class likelihood(object) :
         self._data_read = True
         self._has_covmatrix = False
 
-    def read_phot(self, filename) :
+
+    def read_phot(self, filename):
         """Reads in the photometry file
 
         Parameters
         ----------
-
         filename : string
           Name of file to read input from.  This file should have
           three columns: the wavelength [microns], the flux density
@@ -167,7 +222,9 @@ class likelihood(object) :
         if len(data) == 0 :
             errstr = "No data read from %s" % filename
             raise IOError(errstr)
-        self.set_phot([dat[0] for dat in data],[dat[1] for dat in data],
+
+        self.set_phot([dat[0] for dat in data],
+                      [dat[1] for dat in data],
                       [dat[2] for dat in data])
 
     @property
@@ -191,6 +248,16 @@ class likelihood(object) :
         else:
             return None
 
+    @property 
+    def response_names(self):
+        if not hasattr(self, '_response_names'): return None
+        return self._response_names
+        
+    def get_response(self, name):
+        """ Return the matching response object"""
+        if not hasattr(self, '_responsewheel'): return None
+        return self._responsewheel[name]
+        
     @property 
     def data_flux(self):
         """ The flux densities, in mJy"""
@@ -621,20 +688,28 @@ class likelihood(object) :
         # Return large negative number if bad
         if not self._check_lowlim(pars): return self._badval
 
-        # Compute SED
+        # Set up SED model
         self._set_sed(pars)
 
-        # Assume Gaussian uncertanties, ignore constant prefactor
-        diff = self._flux - self._sed(self._wave)
-        if self._has_covmatrix:
-            lnlike = -0.5*np.dot(diff,np.dot(self._invcovmatrix,diff))
+        # Get model fluxes for comparison with data
+        if self._filter_integrate:
+            model_flux = np.array([resp(self._sed) for 
+                                   resp in self._responses])
         else:
-            lnlike = -0.5*np.sum(diff**2*self._ivar)
+            model_flux = self._sed(self._wave)
 
-        # Add in upper limit priors
+        # Compute likelihood
+        #  Assume Gaussian uncertanties, ignore constant prefactor
+        diff = self._flux - model_flux
+        if self._has_covmatrix:
+            lnlike = -0.5 * np.dot(diff, np.dot(self._invcovmatrix, diff))
+        else:
+            lnlike = -0.5 * np.sum(diff**2 * self._ivar)
+
+        # Add in upper limit priors to likelihood
         lnlike += self._uplim_prior(pars)
 
-        # Add Gaussian priors
+        # Add Gaussian priors to likelihood
         if self._any_gprior:
             for idx, val in enumerate(pars):
                 if self._has_gprior[idx]:

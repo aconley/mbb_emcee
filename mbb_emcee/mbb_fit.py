@@ -70,7 +70,11 @@ class mbb_fit_results(object):
         except AttributeError:
             pass
 
-        
+    @property
+    def response_integrate(self):
+        """Was response integration in use?"""
+        return self.like.response_integrate
+
     @property
     def best_fit(self):
         """ Gets the best fitting point that occurred during the fit
@@ -575,7 +579,8 @@ class mbb_fit(object):
 
 
     def __init__(self, nwalkers=250, photfile=None, covfile=None, 
-                 covextn=0, wavenorm=500.0, noalpha=False, 
+                 covextn=0, responsefile=None, responsedir=None,
+                 wavenorm=500.0, noalpha=False, 
                  opthin=False, nthreads=1):
         """
         Parameters
@@ -592,6 +597,12 @@ class mbb_fit(object):
 
         covextn : integer
            Extension of covaraince file
+
+        responsefile : string
+           Name of response specification file
+
+        responsedir : string
+           Directory to look for response information in
 
         wavenorm : float
            Wavelength of normalization in microns
@@ -613,7 +624,9 @@ class mbb_fit(object):
         self._nthreads = int(nthreads)
         self.like = likelihood(photfile=photfile, covfile=covfile, 
                                covextn=covextn, wavenorm=wavenorm, 
-                               noalpha=noalpha, opthin=opthin)
+                               noalpha=noalpha, opthin=opthin,
+                               responsefile=responsefile,
+                               responsedir=responsedir)
         self.sampler = emcee.EnsembleSampler(self._nwalkers, 5, self.like,
                                              threads=self._nthreads)
         self._sampled = False
@@ -651,7 +664,8 @@ class mbb_fit(object):
         """ Which parameters are fixed?"""
         return self._fixed
 
-    def read_data(self, photfile, covfile=None, covextn=0):
+    def read_data(self, photfile, covfile=None, covextn=0,
+                  responsefile=None, responsedir=None):
         """ Read in photometry data from files
 
         Parameters
@@ -664,11 +678,31 @@ class mbb_fit(object):
 
         covextn : integer
            Extension of covaraince file
+
+        responsefile : string
+           Name of response specification file
+
+        responsedir : string
+           Directory to look for responses in.
+
+        Notes
+        -----
+        Setting responsefile will result in filter integration being
+        turned on for the fit.
         """
+
+        if not responsefile is None:
+            self.like.read_responses(responsefile, 
+                                     responsedir=responsedir)
 
         self.like.read_phot(photfile)
         if not covfile is None:
             self.like.read_cov(covfile, extn=covextn)
+
+    @property
+    def response_integrate(self):
+        """Is response integrating in use"""
+        return self.like.response_integrate
 
     def set_data(self, wave, flux, flux_unc, covmatrix=None):
         """ Set photometry and covariance matrix
@@ -1005,6 +1039,11 @@ class mbb_fit(object):
         # Make sure we have data
         if not self.like.data_read:
             raise Exception("Data not read, needed to do fit")
+
+        if verbose:
+            print "Starting fit"
+            if self.response_integrate:
+                print "Using response integration"
 
         # Make sure initial parameters are valid
         for i in range(5):
