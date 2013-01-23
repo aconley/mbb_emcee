@@ -10,7 +10,7 @@ if (major == 3):
 
 setup(
     name="mbb_emcee",
-    version="0.2.0",
+    version="0.2.1",
     author="Alexander Conley",
     author_email="alexander.conley@colorado.edu",
     packages=["mbb_emcee"],

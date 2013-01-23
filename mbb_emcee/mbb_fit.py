@@ -15,6 +15,8 @@ __all__ = ["mbb_fit", "mbb_fit_results"]
 # multiprocessing pool, which can't be pickled.  So instead 
 # package the results up in this, which also adds methods for 
 # finding central limits, the best fit point, etc., etc.
+# This class also allows the computation of ancillary quantities
+# like L_IR, etc. rather than doing them in the main fit.
 
 class mbb_fit_results(object):
     """Holds results of fit"""
@@ -24,17 +26,27 @@ class mbb_fit_results(object):
                     'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
                     'alpha': 3, 'fnorm': 4}
 
-    def __init__(self, fit):
+    def __init__(self, fit, redshift=None):
         """
         Parameters
         ----------
         fit : mbb_fit
           Fit object
+          
+        redshift : float
+          Redshift of source.  Necessary if you plan to compute
+          dustmass, L_IR, or L_AGN
         """
 
         import copy
 
-        assert type(fit) is mbb_fit, "fit is not mbb_fit"
+        if not isinstance(fit, mbb_fit):
+            raise ValueError("Input is not of type mbb_fit")
+
+        if redshift is None:
+            self._z = None
+        else:
+            self._z = float(redshift)
 
         self.like = copy.deepcopy(fit.like)
         self.chain = copy.copy(fit.sampler.chain)
@@ -49,26 +61,31 @@ class mbb_fit_results(object):
         self._best_fit = (self.chain[idxmax[0], idxmax[1], :],
                           self.lnprobability[idxmax[0], idxmax[1]],
                           idxmax)
-        try:
-            self.lir = copy.copy(fit.lir)
-            self.lir_central_value = self.lir_cen()
-        except AttributeError:
-            pass
-        try:
-            self.lagn = copy.copy(fit.lagn)
-            self.lagn_central_value = self.lagn_cen()
-        except AttributeError:
-            pass
-        try:
-            self.dustmass = copy.copy(fit.dustmass)
-            self.dustmass_central_value = self.dustmass_cen()
-        except AttributeError:
-            pass
-        try:
-            self.peaklambda = copy.copy(fit.peaklambda)
-            self.peaklambda_central_value = self.peaklambda_cen()
-        except AttributeError:
-            pass
+
+        #We don't have any ancillary variables at this point
+        self._has_lir = False
+        self._lir_min = None
+        self._lir_max = None
+        self._has_dustmass = False
+        self._kappa = None
+        self._kappa_wave = None
+        self._has_peaklambda = False
+
+    @property
+    def redshift(self):
+        return self._z
+
+    @property
+    def opthin(self):
+        return self.like.opthin
+
+    @property
+    def noalpha(self):
+        return self.like.noalpha
+
+    @property
+    def wavenorm(self):
+        return self.like.wavenorm
 
     @property
     def response_integrate(self):
@@ -117,6 +134,17 @@ class mbb_fit_results(object):
          """
         
         return self.like.get_sed(self._best_fit[0], wave)
+
+    @property
+    def data(self):
+        """ Get tuple of data wavelengths, flux densities"""
+        if not self.like.data_read: return None
+        return (self.like.data_wave, self.like.data_flux)
+
+    @property
+    def covmatrix(self):
+        """ Get covariance matrix, or None if none present"""
+        return self.like.data_covmatrix
 
 
     def _parcen_internal(self, array, percentile, lowlim=None,
@@ -179,127 +207,6 @@ class mbb_fit_results(object):
         upval  = aint[upidx]
         return (mnval, upval-mnval, mnval-lowval)
     
-    def peaklambda_cen(self, percentile=68.3, lowlim=None, uplim=None):
-        """ Gets the central confidence interval for the peak lambda.
-
-        Parameters
-        ----------
-        percentile : float
-          The percentile to use when computing the uncertainties.
-
-        lowlim : float
-          Smallest value to allow in computation
-
-        uplim : float
-          Largest value to allow in computation
-
-        Returns
-        -------
-        tup : tuple
-          A tuple of the central value, upper uncertainty, 
-          and lower uncertainty of the peak observer frame
-          wavelength in microns.
-        """
-
-        if not hasattr(self, 'peaklambda'): return None
-        return self._parcen_internal(self.peaklambda.flatten(), percentile,
-                                     lowlim=lowlim, uplim=uplim)
-
-    @property
-    def lir_chain(self):
-        """ Get flattened chain of l_ir values in 10^12 solar luminosities"""
-        if not hasattr(self, 'lir'): return None
-        return self.lir.flatten()
-
-    def lir_cen(self, percentile=68.3, lowlim=None, uplim=None):
-        """ Gets the central confidence interval for L_IR.
-
-        Parameters
-        ----------
-        percentile : float
-          The percentile to use when computing the uncertainties.
-
-        lowlim : float
-          Smallest value to allow in computation
-
-        uplim : float
-          Largest value to allow in computation
-
-        Returns
-        -------
-        tup : tuple
-          A tuple of the central value, upper uncertainty, 
-          and lower uncertainty of the IR luminosity (8-1000um)
-          in 10^12 solar luminosities.
-        """
-
-        if not hasattr(self, 'lir'): return None
-        return self._parcen_internal(self.lir.flatten(), percentile,
-                                     lowlim=lowlim, uplim=uplim)
-
-    @property
-    def lagn_chain(self):
-        """ Get flattened chain of l_agn values in 10^12 solar luminosities"""
-        if not hasattr(self, 'lagn'): return None
-        return self.lagn.flatten()
-
-    def lagn_cen(self, percentile=68.3, lowlim=None, uplim=None):
-        """ Gets the central confidence interval for L_AGN
-
-        Parameters
-        ----------
-        percentile : float
-          The percentile to use when computing the uncertainties.
-
-        lowlim : float
-          Smallest value to allow in computation
-
-        uplim : float
-          Largest value to allow in computation
-
-        Returns
-        -------
-        tup : tuple
-          A tuple of the central value, upper uncertainty, 
-          and lower uncertainty of the luminosity from 42.5-122.5um
-          in 10^12 solar luminosities.
-        """
-
-        if not hasattr(self, 'lagn'): return None
-        return self._parcen_internal(self.lagn.flatten(), percentile,
-                                     lowlim=lowlim, uplim=uplim)
-
-    @property
-    def dustmass_chain(self):
-        """ Get flattened chain of dustmass values in 10^8 solar masses"""
-        if not hasattr(self, 'dustmass'): return None
-        return self.dustmass.flatten()
-
-    def dustmass_cen(self, percentile=68.3, lowlim=None, uplim=None):
-        """ Gets the central confidence interval for dustmass.
-
-        Parameters
-        ----------
-        percentile : float
-          The percentile to use when computing the uncertainties.
-
-        lowlim : float
-          Smallest value to allow in computation
-
-        uplim : float
-          Largest value to allow in computation
-
-        Returns
-        -------
-        tup : tuple
-          A tuple of the central value, upper uncertainty, 
-          and lower uncertainty of the dust mass in 10^8 solar masses.
-        """
-
-        if not hasattr(self, 'dustmass'): return None
-        return self._parcen_internal(self.dustmass.flatten(), percentile,
-                                     lowlim=lowlim, uplim=uplim)
-
     def parameter_chain(self, param):
         """ Gets flattened chain for parameter
 
@@ -420,15 +327,360 @@ class mbb_fit_results(object):
         return svals[round(0.01 * percentile * len(svals))]
 
     @property
-    def data(self):
-        """ Get tuple of data wavelengths, flux densities"""
-        if not self.like.data_read: return None
-        return (self.like.data_wave, self.like.data_flux)
+    def has_peaklambda(self):
+        return self._has_peaklambda
 
     @property
-    def covmatrix(self):
-        """ Get covariance matrix, or None if none present"""
-        return self.like.data_covmatrix
+    def peaklambda_chain(self):
+        """ Get flattened chain of peak lambda values in microns"""
+        
+        if not self._has_peaklambda: return None
+        return self.peaklambda.flatten()
+
+    def peaklambda_cen(self, percentile=68.3, lowlim=None, uplim=None):
+        """ Gets the central confidence interval for the peak lambda.
+
+        Parameters
+        ----------
+        percentile : float
+          The percentile to use when computing the uncertainties.
+
+        lowlim : float
+          Smallest value to allow in computation
+
+        uplim : float
+          Largest value to allow in computation
+
+        Returns
+        -------
+        tup : tuple
+          A tuple of the central value, upper uncertainty, 
+          and lower uncertainty of the peak observer frame
+          wavelength in microns.
+        """
+        
+        if not self._has_peaklambda: return None
+        return self._parcen_internal(self.peaklambda.flatten(), percentile,
+                                     lowlim=lowlim, uplim=uplim)
+
+    def compute_peaklambda(self):
+        """ Compute the observer frame wavelength of peak emission in microns from chain"""
+
+        shp = self.chain.shape[0:2]
+        self.peaklambda = np.empty(shp, dtype=np.float)
+        for walkidx in range(shp[0]):
+            # Do first step
+            prevstep = self.chain[walkidx,0,:]
+            sed = modified_blackbody(prevstep[0], prevstep[1], prevstep[2],
+                                     prevstep[3], prevstep[4], 
+                                     opthin=self.opthin,
+                                     noalpha=self.noalpha)
+            self.peaklambda[walkidx, 0] = sed.max_wave()
+            
+            #Now other steps
+            for stepidx in range(1, shp[1]):
+                currstep = self.chain[walkidx,stepidx,:]
+                if np.allclose(prevstep, currstep):
+                    # Repeat, so avoid re-computation
+                    self.peaklambda[walkidx, stepidx] = \
+                        self.peaklambda[walkidx, stepidx-1]
+                else:
+                    sed = modified_blackbody(currstep[0], currstep[1], 
+                                             currstep[2], currstep[3], 
+                                             currstep[4], 
+                                             opthin=self.opthin,
+                                             noalpha=self.noalpha)
+                    self.peaklambda[walkidx, stepidx] =\
+                        sed.max_wave()
+                    prevstep = currstep
+
+        self._has_peaklambda = True
+                
+    @property
+    def has_lir(self):
+        return self._has_lir
+
+    @property
+    def lir_wavelength(self):
+        """ Range, in microns, of L_IR integration"""
+        return (self._lir_min, self._lir_max)
+
+    @property
+    def lir_chain(self):
+        """ Get flattened chain of l_ir values in 10^12 solar luminosities."""
+        
+        if not self._has_lir: return None
+        return self.lir.flatten()
+
+    def lir_cen(self, percentile=68.3, lowlim=None, uplim=None):
+        """ Gets the central confidence interval for L_IR
+
+        Parameters
+        ----------
+        percentile : float
+          The percentile to use when computing the uncertainties.
+
+        lowlim : float
+          Smallest value to allow in computation
+
+        uplim : float
+          Largest value to allow in computation
+
+        Returns
+        -------
+        tup : tuple
+          A tuple of the central value, upper uncertainty, 
+          and lower uncertainty of the IR luminosity (8-1000um)
+          in 10^12 solar luminosities, or None if the L_IR has
+          not been computed
+        """
+        if not self._has_lir: return None
+        return self._parcen_internal(self.lir.flatten(), percentile,
+                                     lowlim=lowlim, uplim=uplim)
+
+    def compute_lir(self, wavemin=8.0, wavemax=1000.0,
+                    maxidx=None, lumdist=None):
+        """ Computes LIR from chain in 10^12 L_sun.
+
+        Parameters
+        ----------
+        wavemin : float
+          Minimum wavelength of L_IR integration, in microns
+
+        wavemax : float
+          Maximum wavelength of L_IR integration, in microns
+
+        maxidx : int
+          Maximum index in each walker to use. 
+
+        lumdist : float
+          Luminosity distance in Mpc.  Otherwise computed from redshift
+          assuming WMAP 7 cosmological model.
+
+        Notes
+        -----
+        The traditional definition of L_IR is 8-1000um.  Sometimes
+        42.5-112.5um is used.
+        """
+
+        if self._z is None:
+            raise Exception("Redshift must be set to compute L_IR")
+
+        self._lir_min = float(wavemin)
+        self._lir_max = float(wavemax)
+        if self._lir_min <= 0:
+            raise ValueError("Invalid wavemin: %f" % self._lir_min)
+        if self._lir_max <= 0:
+            raise ValueError("Invalid wavemax: %f" % self._lir_max)
+        # Get them in ascending order
+        if self._lir_min > self._lir_max:
+            self._lir_min, self._lir_max = self._lir_max, self._lir_min
+
+        # 4*pi*dl^2/L_sun in cgs -- so the output will be in 
+        # solar luminosities; the prefactor is
+        # 4 * pi * mpc_to_cm^2/L_sun
+        if not lumdist is None:
+            if self._z <= -1:
+                raise ValueError("Redshift is less than -1: %f" % self._z)
+            dl = float(lumdist)
+            if dl <= 0.0:
+                raise ValueError("Invalid luminosity distance: %f" % dl)
+        else:
+            if self._z <= 0:
+                raise ValueError("Redshift is invalid: %f" % self._z)
+            import astropy.cosmology
+            dl = astropy.cosmology.WMAP7.luminosity_distance(self._z) #Mpc
+
+        lirprefac = 3.11749657e4 * dl**2 # Also converts to 10^12 lsolar
+
+        # L_IR defined as between 8 and 1000 microns (rest)
+        integrator = mbb_freqint(self._z, self._lir_min, self._lir_max,
+                                 opthin=self.opthin,
+                                 noalpha=self.noalpha)
+
+        # Now we compute L_IR for every step taken.
+        # Explicitly check for repeats
+        shp = self.chain.shape[0:2]
+        steps = shp[1]
+        if not maxidx is None:
+            if maxidx < steps: steps = maxidx
+        self.lir = np.empty((shp[0],steps), dtype=np.float)
+        for walkidx in range(shp[0]):
+            # Do first step
+            prevstep = self.chain[walkidx,0,:]
+            self.lir[walkidx,0] = \
+                lirprefac * integrator(prevstep)
+            for stepidx in range(1, steps):
+                currstep = self.chain[walkidx,stepidx,:]
+                if np.allclose(prevstep, currstep):
+                    # Repeat, so avoid re-computation
+                    self.lir[walkidx, stepidx] =\
+                        self.lir[walkidx, stepidx-1]
+                else:
+                    self.lir[walkidx, stepidx] = \
+                        lirprefac * integrator(prevstep)
+                    prevstep = currstep
+
+        self._has_peaklir = True
+
+    @property
+    def has_dustmass(self):
+        return self._has_dustmass
+
+    @property
+    def dust_kappa(self):
+        """ Dust opacity in m^2 kg^-1"""
+        return self._kappa
+
+    @property
+    def dust_kappa_wavelength(self):
+        """ Rest wavelength dust opacity is defined at, in microns"""
+        return self._kappa_wave
+
+    @property
+    def dustmass_chain(self):
+        """ Get flattened chain of dustmass values in 10^8 solar masses"""
+
+        if not self._has_dustmass: return None
+        return self.dustmass.flatten()
+
+    def dustmass_cen(self, percentile=68.3, lowlim=None, uplim=None):
+        """ Gets the central confidence interval for dustmass.
+
+        Parameters
+        ----------
+        percentile : float
+          The percentile to use when computing the uncertainties.
+
+        lowlim : float
+          Smallest value to allow in computation
+
+        uplim : float
+          Largest value to allow in computation
+
+        Returns
+        -------
+        tup : tuple
+          A tuple of the central value, upper uncertainty, 
+          and lower uncertainty of the dust mass in 10^8 solar masses,
+          or None if not computed.
+        """
+
+        if not self._has_dustmass: return None
+        return self._parcen_internal(self.dustmass.flatten(), percentile,
+                                     lowlim=lowlim, uplim=uplim)
+
+
+    def _dmass_calc(self, step, opz, bnu_fac, temp_fac, knu_fac,
+                    opthin, dl2):
+        """Internal function to comput dustmass in 10^8 M_sun, 
+        given various pre-computed values"""
+
+        msolar8 = 1.97792e41 ## mass of the sun*10^8 in g
+        T = step[0] * opz
+        beta = step[1]
+        S_nu = step[4] * 1e-26 # to erg / s-cm^2-Hz from mJy
+        B_nu = bnu_fac / math.expm1(temp_fac / T) #Planck function
+        #Scale kappa with freq (obs frame ok).  Factor of 10 is
+        # m^2 kg^-1 -> cm^2 g^-1 conversion
+        K_nu = 10.0 * self._kappa * knu_fac**(-beta) 
+        dustmass = dl2 * S_nu / (opz * K_nu * B_nu * msolar8)
+        if not opthin:
+            tau_nu = (step[2] / self.like.wavenorm)**beta
+            op_fac = - tau_nu / math.expm1(-tau_nu)
+            dustmass *= op_fac
+        return dustmass
+
+    def compute_dustmass(self, kappa=2.64, kappa_wave=125.0,
+                         maxidx=None, lumdist=None):
+        """Compute dust mass in 10^8 M_sun from chain
+
+        Parameters
+        ----------
+        kappa : float
+          Dust opacity coeffient in m^2 kg^-1.  The default value,
+          2.64, is from Dunne et al. 2003 at 125um.
+
+        kappa_wave : float
+          The rest frame wavelength that kappa is defined at, in microns.  
+          The default value corresponds to the kappa default.
+        
+        maxidx : int
+          Maximum index in each walker to use.  Ignored if threading.
+
+        lumdist : float
+          Luminosity distance in Mpc.  Otherwise computed from redshift
+          assuming WMAP 7 cosmological model.
+        """
+
+        if self._z is None:
+            raise Exception("Redshift must be set to compute dust mass")
+
+        self._kappa = float(kappa)
+        self._kappa_wave = float(kappa_wave)
+
+        if self._kappa <= 0:
+            raise ValueError("Invalid (non-positive) kappa %f" % self._kappa)
+        if self._kappa_wave <= 0:
+            raise ValueError("Invalid (non-positive) kappa wavelength %f" % \
+                                 self._kappa_wave)
+        
+        # Get luminosity distance
+        if not lumdist is None:
+            if self._z <= -1:
+                raise ValueError("Redshift is less than -1: %f" % self._z)
+            dl = float(lumdist)
+            if dl <= 0.0:
+                raise ValueError("Invalid luminosity distance: %f" % dl)
+        else:
+            if self._z <= 0:
+                raise ValueError("Redshift is invalid: %f" % self._z)
+            import astropy.cosmology
+            dl = astropy.cosmology.WMAP7.luminosity_distance(self._z) #Mpc
+
+        mpc_to_cm = 3.08567758e24
+        dl *= mpc_to_cm
+        dl2 = dl**2
+        opz = 1.0 + self._z
+
+        wavenorm_rest = self.wavenorm / opz # in um
+        nunorm_rest = 299792458e6 / wavenorm_rest # in Hz
+
+        # Precompute some quantities for evaluating the Planck function
+        # h nu / k and 2 h nu^3 / c^2
+        temp_fac = 6.6260693e-27 * nunorm_rest / 1.38065e-16  #h nu / k
+        bnu_fac = 2 * 6.6260693e-27 * nunorm_rest**3 / 299792458e2**2
+
+        # Work out dust opacity factor. 
+        knu_fac = wavenorm_rest / self._kappa_wave
+
+        msolar8 = 1.97792e41 ## mass of the sun*10^8 in g
+
+        shp = self.chain.shape[0:2]
+        steps = shp[1]
+        if not maxidx is None:
+            if maxidx < steps: steps = maxidx
+        self.dustmass = np.empty((shp[0],steps), dtype=np.float)
+        for walkidx in range(shp[0]):
+            # Do first step
+            prevstep = self.chain[walkidx,0,:]
+            self.dustmass[walkidx,0] = \
+                self._dmass_calc(prevstep, opz, bnu_fac, temp_fac, knu_fac, 
+                                 self.opthin, dl2)
+            for stepidx in range(1, steps):
+                currstep = self.chain[walkidx,0,:]
+                if np.allclose(prevstep, currstep):
+                    # Repeat, so avoid re-computation
+                    self.dustmass[walkidx, stepidx] = \
+                        self.dustmass[walkidx, stepidx-1]
+                else:
+                    self.dustmass[walkidx, stepidx] = \
+                        self._dmass_calc(currstep, opz, bnu_fac,
+                                         temp_fac, knu_fac, 
+                                         self.opthin, dl2)
+                    prevstep = currstep
+
+        self._has_dustmass = True
 
     def __str__(self):
         """ String representation of results"""
@@ -451,7 +703,7 @@ class mbb_fit_results(object):
                         self.like.get_gaussian_prior(i)
                 retstr += ") %s\n" % unit
 
-        if not self.like.opthin:
+        if not self.opthin:
             if self.fixed[2]:
                 retstr += "lambda0 (1+z): %0.2f (fixed) [um]\n" %\
                     self.chain[:,:,2].mean()
@@ -487,19 +739,6 @@ class mbb_fit_results(object):
         retstr += "Number of data points: %d\n" % self.like.ndata
         retstr += "ChiSquare of best fit point: %0.2f" % self.best_fit_chisq
 
-        if hasattr(self,'lir_central_value'):
-            retstr += "\nL_IR: %0.2f +%0.2f -%0.2f [10^12 Lsun]" % \
-                self.lir_central_value
-        if hasattr(self,'lagn_central_value'):
-            retstr += "\nL_AGN: %0.2f +%0.2f -%0.2f [10^12 Lsun]" % \
-                self.lagn_central_value
-        if hasattr(self,'dustmass_central_value'):
-            retstr += "\nM_dust: %0.2f +%0.2f -%0.2f [10^8 Msun]" % \
-                self.dustmass_central_value
-        if hasattr(self,'peaklambda_central_value'):
-            retstr += "\nlambda_peak: %0.2f +%0.2f -%0.2f [um]" % \
-                self.peaklambda_central_value
-            
         return retstr
 
 ############################################################
@@ -1097,290 +1336,3 @@ class mbb_fit(object):
                 print "\tfnorm:    %f" % acor[4]
             except ImportError :
                 pass
-
-    def get_peaklambda(self):
-        """ Find the wavelength of peak emission in microns from chain"""
-
-        shp = self.sampler.chain.shape[0:2]
-        self.peaklambda = np.empty(shp, dtype=np.float)
-        for walkidx in range(shp[0]):
-            # Do first step
-            prevstep = self.sampler.chain[walkidx,0,:]
-            sed = modified_blackbody(prevstep[0], prevstep[1], prevstep[2],
-                                     prevstep[3], prevstep[4], 
-                                     opthin=self._opthin,
-                                     noalpha=self._noalpha)
-            self.peaklambda[walkidx, 0] = sed.max_wave()
-            
-            #Now other steps
-            for stepidx in range(1, shp[1]):
-                currstep = self.sampler.chain[walkidx,stepidx,:]
-                if np.allclose(prevstep, currstep):
-                    # Repeat, so avoid re-computation
-                    self.peaklambda[walkidx, stepidx] = \
-                        self.peaklambda[walkidx, stepidx-1]
-                else:
-                    sed = modified_blackbody(currstep[0], currstep[1], 
-                                             currstep[2], currstep[3], 
-                                             currstep[4], 
-                                             opthin=self._opthin,
-                                             noalpha=self._noalpha)
-                    self.peaklambda[walkidx, stepidx] =\
-                        sed.max_wave()
-                    prevstep = currstep
-
-    def get_lir(self, redshift, maxidx=None, lumdist=None):
-        """ Computes 8-1000 micron LIR from chain in 10^12 solar luminosities.
-
-        Parameters
-        ----------
-        redshift : float
-          Redshift of source.
-        
-        maxidx : int
-          Maximum index in each walker to use.  Ignored if threading.
-
-        lumdist : float
-          Luminosity distance in Mpc.  Otherwise computed from redshift
-          assuming WMAP 7 cosmological model.
-        """
-
-        if not self._sampled:
-            raise Exception("Chain has not been run in get_lir")
-
-        # 4*pi*dl^2/L_sun in cgs -- so the output will be in 
-        # solar luminosities; the prefactor is
-        # 4 * pi * mpc_to_cm^2/L_sun
-        z = float(redshift)
-        if not lumdist is None:
-            if z <= -1:
-                raise ValueError("Redshift is less than -1: %f" % z)
-            dl = float(lumdist)
-            if dl <= 0.0:
-                raise ValueError("Invalid luminosity distance: %f" % dl)
-        else:
-            if z <= 0:
-                raise ValueError("Redshift is invalid: %f" % z)
-            import astropy.cosmology
-            dl = astropy.cosmology.WMAP7.luminosity_distance(z) #Mpc
-
-        lirprefac = 3.11749657e4 * dl**2 # Also converts to 10^12 lsolar
-
-        # L_IR defined as between 8 and 1000 microns (rest)
-        integrator = mbb_freqint(z, 8.0, 1000.0, opthin=self._opthin,
-                                 noalpha=self._noalpha)
-
-        # Now we compute L_IR for every step taken.
-        # Two cases: using multiprocessing, and serially.
-        if self._nthreads > 1:
-            shp = self.sampler.chain.shape[0:2]
-            npar = self.sampler.chain.shape[2]
-            nel = shp[0] * shp[1]
-            pool = multiprocessing.Pool(self._nthreads)
-            rchain = self.sampler.chain.reshape(nel, npar)
-            lir = np.array(pool.map(integrator,
-                                    [rchain[i] for i in xrange(nel)]))
-            self.lir = lirprefac * lir.reshape((shp[0], shp[1]))
-        else :
-            # Explicitly check for repeats
-            shp = self.sampler.chain.shape[0:2]
-            steps = shp[1]
-            if not maxidx is None:
-                if maxidx < steps: steps = maxidx
-            self.lir = np.empty((shp[0],steps), dtype=np.float)
-            for walkidx in range(shp[0]):
-                # Do first step
-                prevstep = self.sampler.chain[walkidx,0,:]
-                self.lir[walkidx,0] = \
-                    lirprefac * integrator(prevstep)
-                for stepidx in range(1, steps):
-                    currstep = self.sampler.chain[walkidx,stepidx,:]
-                    if np.allclose(prevstep, currstep):
-                        # Repeat, so avoid re-computation
-                        self.lir[walkidx, stepidx] =\
-                            self.lir[walkidx, stepidx-1]
-                    else:
-                        self.lir[walkidx, stepidx] = \
-                            lirprefac * integrator(prevstep)
-                        prevstep = currstep
-
-    def get_lagn(self, redshift, maxidx=None, lumdist=None):
-        """ Compute 42.5-112.5 micron luminosity from chain in 10^12 solar 
-        luminosites
-
-        Parameters
-        ----------
-        redshift : float
-          Redshift of source.
-        
-        maxidx : int
-          Maximum index in each walker to use.  Ignored if threading.
-
-        lumdist : float
-          Luminosity distance in Mpc.  Otherwise computed from redshift
-          assuming WMAP 7 cosmological model.
-        """
-
-        try:
-            import astropy.cosmology
-        except ImportError:
-            raise ImportError("Need to have astropy installed if getting LAGN")
-        
-        if not self._sampled:
-            raise Exception("Chain has not been run in get_agn")
-
-        # 4*pi*dl^2/L_sun in cgs -- so the output will be in 
-        # solar luminosities; the prefactor is
-        # 4 * pi * mpc_to_cm^2/L_sun
-        z = float(redshift)
-        if not lumdist is None:
-            if z <= -1:
-                raise ValueError("Redshift is less than -1: %f" % z)
-            dl = float(lumdist)
-            if dl <= 0.0:
-                raise ValueError("Invalid luminosity distance: %f" % dl)
-        else:
-            if z <= 0:
-                raise ValueError("Redshift is invalid: %f" % z)
-            import astropy.cosmology
-            dl = astropy.cosmology.WMAP7.luminosity_distance(z) #Mpc
-
-        lagnprefac = 3.11749657e4 * dl**2
-
-        # L_IR defined as between 42.5 and 122.5 microns (rest)
-        integrator = mbb_freqint(z, 42.5, 122.5, opthin=self._opthin,
-                                 noalpha=self._noalpha)
-
-        # Now we compute L_AGN for every step taken.
-        # Two cases: using multiprocessing, and serially.
-        if self._nthreads > 1:
-            shp = self.sampler.chain.shape[0:2]
-            npar = self.sampler.chain.shape[2]
-            nel = shp[0] * shp[1]
-            pool = multiprocessing.Pool(self._nthreads)
-            rchain = self.sampler.chain.reshape(nel, npar)
-            lagn = np.array(pool.map(integrator,
-                                        [rchain[i] for i in xrange(nel)]))
-            self.lagn = lagnprefac * lagn.reshape(shp[0], shp[1])
-        else :
-            # Explicitly check for repeats
-            shp = self.sampler.chain.shape[0:2]
-            steps = shp[1]
-            if not maxidx is None:
-                if maxidx < steps: steps = maxidx
-            self.lagn = np.empty((shp[0],steps), dtype=np.float)
-            for walkidx in range(shp[0]):
-                # Do first step
-                prevstep = self.sampler.chain[walkidx,0,:]
-                self.lagn[walkidx,0] = \
-                    lagnprefac * integrator(prevstep)
-                for stepidx in range(1, steps):
-                    currstep = self.sampler.chain[walkidx,stepidx,:]
-                    if np.allclose(prevstep, currstep):
-                        # Repeat, so avoid re-computation
-                        self.lagn[walkidx, stepidx] =\
-                            self.lagn[walkidx, stepidx-1]
-                    else:
-                        self.lagn[walkidx, stepidx] = \
-                            lagnprefac * integrator(prevstep)
-                        prevstep = currstep
-
-
-    def _dmass_calc(self, step, opz, bnu_fac, temp_fac, knu_fac,
-                    opthin, dl2):
-        """Internal function to comput dustmass in 10^8 M_sun, 
-        given various pre-computed values"""
-
-        msolar8 = 1.97792e41 ## mass of the sun*10^8 in g
-        T = step[0] * opz
-        beta = step[1]
-        S_nu = step[4] * 1e-26 # to erg / s-cm^2-Hz from mJy
-        B_nu = bnu_fac / math.expm1(temp_fac / T) #Planck function
-        # Dunne optical depth is 2.64 m^2 kg^-1 = 26.4 cm^2 g^-1
-        K_nu = 26.4 * knu_fac**(-beta) #Scaling with freq (obs frame ok)
-        dustmass = dl2 * S_nu / (opz * K_nu * B_nu * msolar8)
-        if not opthin:
-            tau_nu = (step[2] / self._wavenorm)**beta
-            op_fac = - tau_nu / math.expm1(-tau_nu)
-            dustmass *= op_fac
-        return dustmass
-
-    def get_dustmass(self, redshift, maxidx=None, lumdist=None):
-        """Compute dust mass in 10^8 M_sun from chain
-
-        Parameters
-        ----------
-        redshift : float
-          Redshift of source.
-        
-        maxidx : int
-          Maximum index in each walker to use.  Ignored if threading.
-
-        lumdist : float
-          Luminosity distance in Mpc.  Otherwise computed from redshift
-          assuming WMAP 7 cosmological model.
-        """
-
-        # This one is not parallelized because the calculation
-        # is relatively trivial
-
-        if not self._sampled:
-            raise Exception("Chain has not been run in get_mdust")
-
-        # Get luminosity distance
-        z = float(redshift)
-        if not lumdist is None:
-            if z <= -1:
-                raise ValueError("Redshift is less than -1: %f" % z)
-            dl = float(lumdist)
-            if dl <= 0.0:
-                raise ValueError("Invalid luminosity distance: %f" % dl)
-        else:
-            if z <= 0:
-                raise ValueError("Redshift is invalid: %f" % z)
-            import astropy.cosmology
-            dl = astropy.cosmology.WMAP7.luminosity_distance(z) #Mpc
-
-        mpc_to_cm = 3.08567758e24
-        dl *= mpc_to_cm
-        dl2 = dl**2
-        opz = 1.0 + z
-
-        wavenorm_rest = self._wavenorm / opz # in um
-        nunorm_rest = 299792458e6 / wavenorm_rest # in Hz
-
-        # Precompute some quantities for evaluating the Planck function
-        # h nu / k and 2 h nu^3 / c^2
-        temp_fac = 6.6260693e-27 * nunorm_rest / 1.38065e-16  #h nu / k
-        bnu_fac = 2 * 6.6260693e-27 * nunorm_rest**3 / 299792458e2**2
-
-        # The dust factor we use is defined at 125 microns, rest,
-        # and scales with beta
-        knu_fac = wavenorm_rest / 125.0
-
-        msolar8 = 1.97792e41 ## mass of the sun*10^8 in g
-
-        shp = self.sampler.chain.shape[0:2]
-        steps = shp[1]
-        if not maxidx is None:
-            if maxidx < steps: steps = maxidx
-        self.dustmass = np.empty((shp[0],steps), dtype=np.float)
-        for walkidx in range(shp[0]):
-            # Do first step
-            prevstep = self.sampler.chain[walkidx,0,:]
-            self.dustmass[walkidx,0] = self._dmass_calc(prevstep, opz, bnu_fac,
-                                                        temp_fac, knu_fac, 
-                                                        self._opthin, dl2)
-            for stepidx in range(1, steps):
-                currstep = self.sampler.chain[walkidx,0,:]
-                if np.allclose(prevstep, currstep):
-                    # Repeat, so avoid re-computation
-                    self.dustmass[walkidx, stepidx] = \
-                        self.dustmass[walkidx, stepidx-1]
-                else:
-                    self.dustmass[walkidx, stepidx] = \
-                        self._dmass_calc(currstep, opz, bnu_fac,
-                                         temp_fac, knu_fac, 
-                                         self._opthin, dl2)
-                    prevstep = currstep
-

@@ -4,4 +4,4 @@ from likelihood import *
 from utility import *
 from response import *
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"

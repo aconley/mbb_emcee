@@ -91,14 +91,18 @@ if __name__ == "__main__":
                         help="Initial Lambda0*(1+z)")
     parser.add_argument('--initFnorm', action='store', type=float, default=40.0,
                         help="Initial Fnorm")
+    parser.add_argument('--kappa',action='store', nargs=2, type=float,
+                        default=(2.64, 125),
+                        help="Dust opacity in m^2 kg^-1 and wavelength in um")
     parser.add_argument('--get_dustmass',action='store_true',default=False,
                         help="Estimate dust mass in 10^8 M_sun.  You must set the redshift")
-    parser.add_argument('--get_lagn',action='store_true',default=False,
-                        help="Get the rest frame 42.5 to 122.5um lumiosity.  You must set the redshift")
     parser.add_argument('--get_lir',action='store_true',default=False,
                         help="Get the rest frame 8-1000um luminosity.  You must set the redshift")
     parser.add_argument('--get_peaklambda', action='store_true', default=False,
                         help="Get the observer frame SED peak wavelength")
+    parser.add_argument('--lir_range', action='store', type=float, nargs=2,
+                        default=(8,1000.0), 
+                        help="Rest frame wavelength range of L_IR computation, in um")
     parser.add_argument("--lowT",action='store',type=float,default=None,
                         help="Lower limit on T (Def:0)")
     parser.add_argument("--lowBeta",action='store',type=float,default=None,
@@ -115,7 +119,7 @@ if __name__ == "__main__":
                         help="Directory to look for files in",
                         default=None)
     parser.add_argument('--maxidx',action='store',type=int,default=None,
-                        help="Maximum number of steps (per walker) to include in L_IR, L_AGN, and dustmass.  Ignored if using threading.")
+                        help="Maximum number of steps (per walker) to include in L_IR, dustmass.")
     parser.add_argument('-n','--nwalkers',action='store',type=int,
                         help="Number of walkers to use in MCMC (Def: 250)",
                         default=250)
@@ -256,43 +260,45 @@ if __name__ == "__main__":
     fit.run(parse_results.burn, parse_results.nsteps, p0, 
             verbose=parse_results.verbose)
 
+    # Jam results into output structure
+    res = mbb_emcee.mbb_fit_results(fit, parse_results.redshift)
+    del fit
+
     # Peak wavelength computation
     if parse_results.get_peaklambda:
         if parse_results.verbose: print "Computing peak obs-frame wavelength"
-        fit.get_peaklambda()
+        res.compute_peaklambda()
 
     # L_IR computation
     if parse_results.get_lir: 
         if parse_results.redshift is None:
             raise ValueError("Must provide redshift if computing L_IR")
-        if parse_results.verbose: print "Computing L_IR (8-1000)"
-        fit.get_lir(parse_results.redshift, maxidx=parse_results.maxidx,
-                    lumdist=parse_results.lumdist)
-
-
-    # L_AGN computation
-    if parse_results.get_lagn: 
-        if parse_results.redshift is None:
-            raise ValueError("Must provide redshift if computing L_AGN")
-        if parse_results.verbose: print "Computing L_AGN (42.5-122.5)"
-        fit.get_lagn(parse_results.redshift, maxidx=parse_results.maxidx,
-                     lumdist=parse_results.lumdist)
+        minwave = parse_results.lir_range[0]
+        maxwave = parse_results.lir_range[1]
+        if parse_results.verbose: print "Computing L_IR (%0.1f-%0.1fum)" %\
+                (minwave, maxwave)
+        res.compute_lir(wavemin=minwave, wavemax=maxwave, 
+                        maxidx=parse_results.maxidx,
+                        lumdist=parse_results.lumdist)
 
     # M_dust computation
     if parse_results.get_dustmass: 
         if parse_results.redshift is None:
             raise ValueError("Must provide redshift if computing m_dust")
+        kappa = parse_results.kappa[0]
+        kappa_wave = parse_results.kappa[1]
         if parse_results.verbose: print "Computing dust mass"
-        fit.get_dustmass(parse_results.redshift, maxidx=parse_results.maxidx,
-                         lumdist=parse_results.lumdist)
+        res.compute_dustmass(kappa=kappa, kappa_wave=kappa_wave, 
+                             maxidx=parse_results.maxidx,
+                             lumdist=parse_results.lumdist)
 
-    res = mbb_emcee.mbb_fit_results(fit)
+    #Summarize results
     if parse_results.verbose:
         print "Fit results:"
         print res
 
-    # Jam parse_results into a output struct, and save that
-    if parse_results.verbose : print "Saving results"
 
+    #Save output
+    if parse_results.verbose : print "Saving results"
     with open(parse_results.outfile,'wb') as fl:
         pickle.dump(res, fl)
