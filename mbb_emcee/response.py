@@ -1,5 +1,6 @@
 import math
 import numpy
+import os.path
 
 """Astronomical instrument response modeling"""
 
@@ -93,7 +94,6 @@ class response(object):
         """
 
         import astropy.io.ascii
-        import os.path
         import scipy.integrate
 
         self._name = name

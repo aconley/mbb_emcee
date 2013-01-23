@@ -6,7 +6,7 @@ This works in the observer frame."""
 #Requires that numpy, scipy, emcee, asciitable, pyfits are installed
 
 import numpy
-from mbb_emcee import mbb_fit, mbb_fit_results
+import mbb_emcee
 
 if __name__ == "__main__":
     import argparse
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     parser.add_argument("-v","--verbose",action="store_true",default=False,
                         help="Print status messages")
     parser.add_argument('-V','--version',action='version',
-                        version='%(prog)s 0.2.0')
+                        version='%(prog)s ' + ("%s" % mbb_emcee.__version__))
     parser.add_argument('-w','--wavenorm',action='store', 
                         type=float, default=500.0,
                         help="Observer frame wavelength of normalization (def: 500)")
@@ -184,14 +184,14 @@ if __name__ == "__main__":
     if (nwalkers <= 0) :
         raise ValueError("Invalid (non-positive) nwalkers: %d" % nwalkers)
 
-    fit = mbb_fit(nwalkers=nwalkers, photfile=photfile, covfile=covfile, 
-                  covextn=parse_results.covextn,
-                  wavenorm=parse_results.wavenorm, 
-                  noalpha=parse_results.noalpha,
-                  opthin=parse_results.opthin, 
-                  nthreads=parse_results.threads,
-                  responsefile=parse_results.responsefile,
-                  responsedir=parse_results.responsedir) 
+    fit = mbb_emcee.mbb_fit(nwalkers=nwalkers, photfile=photfile, 
+                            covfile=covfile,  covextn=parse_results.covextn,
+                            wavenorm=parse_results.wavenorm, 
+                            noalpha=parse_results.noalpha,
+                            opthin=parse_results.opthin, 
+                            nthreads=parse_results.threads,
+                            responsefile=parse_results.responsefile,
+                            responsedir=parse_results.responsedir)
     
     # Set parameters fixed/limits if present
     if parse_results.fixT: fit.fix_param('T')
@@ -286,7 +286,7 @@ if __name__ == "__main__":
         fit.get_dustmass(parse_results.redshift, maxidx=parse_results.maxidx,
                          lumdist=parse_results.lumdist)
 
-    res = mbb_fit_results(fit)
+    res = mbb_emcee.mbb_fit_results(fit)
     if parse_results.verbose:
         print "Fit results:"
         print res

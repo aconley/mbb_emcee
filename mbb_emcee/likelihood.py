@@ -171,12 +171,14 @@ class likelihood(object) :
                 self._responses.append(self._responsewheel[name])
 
             self._response_names = [r.name for r in self._responses]
-            self._wave = [resp.effective_wavelength for resp in self._responses]
+            self._wave = np.array([resp.effective_wavelength for 
+                                   resp in self._responses])
         else:
             self._wave = np.asarray(firstarg, dtype=np.float64)
-            self._ndata = len(self._wave) 
-            if self._ndata == 0:
-                raise ValueError("No elements in wavelength vector")
+
+        self._ndata = len(self._wave) 
+        if self._ndata == 0:
+            raise ValueError("No elements in wavelength vector")
 
         self._flux = np.asarray(flux)
         self._flux_unc = np.asarray(flux_unc)
@@ -692,7 +694,7 @@ class likelihood(object) :
         self._set_sed(pars)
 
         # Get model fluxes for comparison with data
-        if self._filter_integrate:
+        if self._response_integrate:
             model_flux = np.array([resp(self._sed) for 
                                    resp in self._responses])
         else:
