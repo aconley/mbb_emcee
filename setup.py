@@ -10,7 +10,7 @@ if (major == 3):
 
 setup(
     name="mbb_emcee",
-    version="0.1.4",
+    version="0.2.0",
     author="Alexander Conley",
     author_email="alexander.conley@colorado.edu",
     packages=["mbb_emcee"],
@@ -25,7 +25,7 @@ setup(
         "Operating System :: OS Independent",
         "Programming Language :: Python",
     ],
-    requires = ['numpy (>1.5.0)', 'emcee (>1.0.0)', 'scipy', 
+    requires = ['numpy (>1.5.0)', 'emcee (>1.0.0)', 'scipy (>0.8.0)', 
                 'astropy (>0.1.0)']
 )
 

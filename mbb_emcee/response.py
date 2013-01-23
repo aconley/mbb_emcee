@@ -86,7 +86,7 @@ class response(object):
         centered on val1 and with a width of val2 (in the units of xunits)
 
         If inputfile is gauss_val1_val2, then the filter function is a Gaussian centered
-        on val1 with a FWHM of val2.  It is sampled every FWHM/11 steps
+        on val1 with a FWHM of val2.  It is sampled every FWHM/7 steps
         out to 3*FWHM in each direction.
 
         So don't name your input files delta_?, gauss_?, or box_?
@@ -139,7 +139,7 @@ class response(object):
                 fwhm = float(spl[2])
                 minval = cent - 3.0*fwhm
                 maxval = cent + 3.0*fwhm
-                npoints = 67 # (FWHM/11)
+                npoints = 43 # (FWHM/7)
                 sig = fwhm / math.sqrt(8 * math.log(2))
                 xvals = numpy.linspace(cent - 3.0*fwhm, 
                                        cent + 3.0*fwhm,
