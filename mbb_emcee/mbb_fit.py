@@ -682,13 +682,14 @@ class mbb_fit_results(object):
 
         self._has_dustmass = True
 
-    def _predict_flux(self, wave, maxidx=None):
+    def _predict_flux(self, spec, maxidx=None):
         """ Predict flux density at a given wavelength from the fit
 
         Parameters
         ----------
-        wave : float
-          Wavelength to predict flux at.
+        spec : float or string
+          Either wavelength to predict flux at or name of an instrument
+          response function to integrate.
 
         maxidx : int
           Maximum index in each walker to use. 
@@ -696,12 +697,27 @@ class mbb_fit_results(object):
         Returns
         -------
         fluxchain : ndarray
-          Array of predictions.
+          Array of predictions.  If spec is a float, this is
+          the sed flux at that value.  If it is a string, it is
+          the response predicted for that response function name.
+          So, for example, if spec = 'SPIRE_250um' it will be
+          the predicted flux integrated through the Herschel-SPIRE
+          250um filter function -- if that was available to the fit.
         """
 
-        wv = float(wave)
-        if (wv <= 0):
-            raise ValueError("Invalid wavelength %f" % wv)
+        if isinstance(spec, basestring):
+            if not self.like._response_integrate:
+                raise Error("Asked for response integration, but no "
+                            " response functions available from original fit")
+            if not self.like.has_response(spec):
+                raise ValueError("Do not have response function matching %s" % spec)
+            resp = self.like.get_response(spec)
+            doing_response = True
+        else:
+            wv = float(spec)
+            if (wv <= 0):
+                raise ValueError("Invalid wavelength %f" % wv)
+            doing_response = False
 
         # Do computation.  explicitly checking for repeats.
         shp = self.chain.shape[0:2]
@@ -716,7 +732,10 @@ class mbb_fit_results(object):
                                      prevstep[3], prevstep[4], 
                                      opthin=self.opthin,
                                      noalpha=self.noalpha)
-            fpred[walkidx, 0] = sed(wv)
+            if doing_response:
+                fpred[walkidx, 0] = resp(sed)
+            else:
+                fpred[walkidx, 0] = sed(wv)
 
             for stepidx in range(1, steps):
                 currstep = self.chain[walkidx,stepidx,:]
@@ -729,19 +748,24 @@ class mbb_fit_results(object):
                                              currstep[2], currstep[3], 
                                              currstep[4], opthin=self.opthin,
                                              noalpha=self.noalpha)
-                    fpred[walkidx, stepidx] = sed(wv)
+                    if doing_response:
+                        fpred[walkidx, stepidx] = resp(sed)
+                    else:
+                        fpred[walkidx, stepidx] = sed(wv)
+
                     prevstep = currstep
 
         return fpred
 
-    def predflux_cen(self, wave, percentile=68.3, maxidx=None,
+    def predflux_cen(self, spec, percentile=68.3, maxidx=None,
                      lowlim=None, uplim=None):
         """ Gets the central confidence interval for predicted flux
 
         Parameters
         ----------
-        wave : float
-          Wavelength, in microns, to compute predicted flux at
+        spec : float or string
+          Either wavelength to predict flux at or name of an instrument
+          response function to integrate.
 
         percentile : float
           The percentile to use when computing the uncertainties.
@@ -759,11 +783,15 @@ class mbb_fit_results(object):
         -------
         tup : tuple
           A tuple of the central value, upper uncertainty, 
-          and lower uncertainty of the dust mass in 10^8 solar masses,
-          or None if not computed.
+          and lower uncertainty of the predicted flux in mJy.
+          If spec was a float, this is the sed flux at that value.  
+          If it was a string, it is the response predicted for that 
+          response function name. So, for example, if spec = 'SPIRE_250um' 
+          it will be the predicted flux integrated through the Herschel-SPIRE
+          250um filter function -- if that was available to the fit.
         """
 
-        pflux = self._predict_flux(wave, maxidx)
+        pflux = self._predict_flux(spec, maxidx)
 
         return self._parcen_internal(pflux.flatten(), percentile,
                                      lowlim=lowlim, uplim=uplim)

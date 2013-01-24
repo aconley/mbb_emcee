@@ -252,9 +252,15 @@ class likelihood(object) :
 
     @property 
     def response_names(self):
+        """ Returns names of responses corresponding to data"""
         if not hasattr(self, '_response_names'): return None
         return self._response_names
         
+    def has_response(self, name):
+        """ Is the specified response function available?"""
+        if not hasattr(self, '_responsewheel'): return False
+        return self._responsewheel.has_key(name)
+
     def get_response(self, name):
         """ Return the matching response object"""
         if not hasattr(self, '_responsewheel'): return None
