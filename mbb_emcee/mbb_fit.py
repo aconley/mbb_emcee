@@ -521,7 +521,7 @@ class mbb_fit_results(object):
                         lirprefac * integrator(prevstep)
                     prevstep = currstep
 
-        self._has_peaklir = True
+        self._has_lir = True
 
     @property
     def has_dustmass(self):
@@ -681,6 +681,93 @@ class mbb_fit_results(object):
                     prevstep = currstep
 
         self._has_dustmass = True
+
+    def _predict_flux(self, wave, maxidx=None):
+        """ Predict flux density at a given wavelength from the fit
+
+        Parameters
+        ----------
+        wave : float
+          Wavelength to predict flux at.
+
+        maxidx : int
+          Maximum index in each walker to use. 
+
+        Returns
+        -------
+        fluxchain : ndarray
+          Array of predictions.
+        """
+
+        wv = float(wave)
+        if (wv <= 0):
+            raise ValueError("Invalid wavelength %f" % wv)
+
+        # Do computation.  explicitly checking for repeats.
+        shp = self.chain.shape[0:2]
+        steps = shp[1]
+        if not maxidx is None:
+            if maxidx < steps: steps = maxidx
+        fpred = np.empty((shp[0],steps), dtype=np.float)
+        for walkidx in range(shp[0]):
+            # Do first step
+            prevstep = self.chain[walkidx,0,:]
+            sed = modified_blackbody(prevstep[0], prevstep[1], prevstep[2],
+                                     prevstep[3], prevstep[4], 
+                                     opthin=self.opthin,
+                                     noalpha=self.noalpha)
+            fpred[walkidx, 0] = sed(wv)
+
+            for stepidx in range(1, steps):
+                currstep = self.chain[walkidx,stepidx,:]
+                if np.allclose(prevstep, currstep):
+                    # Repeat, so avoid re-computation
+                    fpred[walkidx, stepidx] =\
+                        fpred[walkidx, stepidx-1]
+                else:
+                    sed = modified_blackbody(currstep[0], currstep[1], 
+                                             currstep[2], currstep[3], 
+                                             currstep[4], opthin=self.opthin,
+                                             noalpha=self.noalpha)
+                    fpred[walkidx, stepidx] = sed(wv)
+                    prevstep = currstep
+
+        return fpred
+
+    def predflux_cen(self, wave, percentile=68.3, maxidx=None,
+                     lowlim=None, uplim=None):
+        """ Gets the central confidence interval for predicted flux
+
+        Parameters
+        ----------
+        wave : float
+          Wavelength, in microns, to compute predicted flux at
+
+        percentile : float
+          The percentile to use when computing the uncertainties.
+
+        maxidx : int
+          Maximum index in each walker to use. 
+
+        lowlim : float
+          Smallest value to allow in computation
+
+        uplim : float
+          Largest value to allow in computation
+
+        Returns
+        -------
+        tup : tuple
+          A tuple of the central value, upper uncertainty, 
+          and lower uncertainty of the dust mass in 10^8 solar masses,
+          or None if not computed.
+        """
+
+        pflux = self._predict_flux(wave, maxidx)
+
+        return self._parcen_internal(pflux.flatten(), percentile,
+                                     lowlim=lowlim, uplim=uplim)
+
 
     def __str__(self):
         """ String representation of results"""
