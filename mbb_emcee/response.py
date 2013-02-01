@@ -49,7 +49,7 @@ class response(object):
 
         inputfile : string
           Name of input file.  Must be a text file.  If this has the special
-          values delta_?, boxcar_?, or gauss_?, then rather than reading from a file
+          values delta_?, box_?, or gauss_?, then rather than reading from a file
           the passband is created internally.
 
         xtype : string
@@ -83,7 +83,7 @@ class response(object):
         is microns, then delta_880 sets up a delta function at 880um.  If xunit
         were GHz, then it would be a delta function at 880GHz.
 
-        If inputfile is boxcar_val1_val2, then the filter function is a box with 11 points
+        If inputfile is box_val1_val2, then the filter function is a box with 11 points
         centered on val1 and with a width of val2 (in the units of xunits)
 
         If inputfile is gauss_val1_val2, then the filter function is a Gaussian centered
