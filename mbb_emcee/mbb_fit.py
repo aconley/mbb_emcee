@@ -517,8 +517,9 @@ class mbb_fit_results(object):
                     self.lir[walkidx, stepidx] =\
                         self.lir[walkidx, stepidx-1]
                 else:
+                    # New step
                     self.lir[walkidx, stepidx] = \
-                        lirprefac * integrator(prevstep)
+                        lirprefac * integrator(currstep)
                     prevstep = currstep
 
         self._has_lir = True
