@@ -24,7 +24,7 @@ class mbb_fit_results(object):
     """ Parameter order dictionary.  Lowercased."""
     _param_order = {'t': 0, 't/(1+z)': 0, 'beta': 1, 'lambda0': 2,
                     'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
-                    'alpha': 3, 'fnorm': 4}
+                    'alpha': 3, 'fnorm': 4, 'f500': 4}
 
     def __init__(self, fit, redshift=None):
         """
@@ -137,9 +137,10 @@ class mbb_fit_results(object):
 
     @property
     def data(self):
-        """ Get tuple of data wavelengths, flux densities"""
+        """ Get tuple of data wavelengths, flux densities, uncertainties"""
         if not self.like.data_read: return None
-        return (self.like.data_wave, self.like.data_flux)
+        return (self.like.data_wave, self.like.data_flux,
+                self.like.data_flux_unc)
 
     @property
     def covmatrix(self):
@@ -455,7 +456,7 @@ class mbb_fit_results(object):
 
         lumdist : float
           Luminosity distance in Mpc.  Otherwise computed from redshift
-          assuming WMAP 7 cosmological model.
+          assuming WMAP 9 cosmological model.
 
         Notes
         -----
@@ -489,7 +490,7 @@ class mbb_fit_results(object):
             if self._z <= 0:
                 raise ValueError("Redshift is invalid: %f" % self._z)
             import astropy.cosmology
-            dl = astropy.cosmology.WMAP7.luminosity_distance(self._z) #Mpc
+            dl = astropy.cosmology.WMAP9.luminosity_distance(self._z) #Mpc
 
         lirprefac = 3.11749657e4 * dl**2 # Also converts to 10^12 lsolar
 
@@ -611,7 +612,7 @@ class mbb_fit_results(object):
 
         lumdist : float
           Luminosity distance in Mpc.  Otherwise computed from redshift
-          assuming WMAP 7 cosmological model.
+          assuming WMAP 9 cosmological model.
         """
 
         if self._z is None:
@@ -637,7 +638,7 @@ class mbb_fit_results(object):
             if self._z <= 0:
                 raise ValueError("Redshift is invalid: %f" % self._z)
             import astropy.cosmology
-            dl = astropy.cosmology.WMAP7.luminosity_distance(self._z) #Mpc
+            dl = astropy.cosmology.WMAP9.luminosity_distance(self._z) #Mpc
 
         mpc_to_cm = 3.08567758e24
         dl *= mpc_to_cm
@@ -926,7 +927,7 @@ class mbb_fit(object):
     """ Parameter order dictionary.  Lowercased."""
     _param_order = {'t': 0, 't/(1+z)': 0, 'beta': 1, 'lambda0': 2,
                     'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
-                    'alpha': 3, 'fnorm': 4}
+                    'alpha': 3, 'fnorm': 4, 'f500': 4}
 
     """ Parameter names"""
     _parnames = np.array(['T/(1+z)', 'Beta', 'Lambda0*(1+z)', 

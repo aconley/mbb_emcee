@@ -124,7 +124,7 @@ class response(object):
                 return
             elif bs == "box":
                 if len(spl) != 3:
-                    raise ValueError("box car needs 2 params")
+                    raise ValueError("box car needs 2 params in %s" % inputfile)
                 cent = float(spl[1])
                 width = float(spl[2])
                 npoints = 11
@@ -134,7 +134,8 @@ class response(object):
                 self._resp = numpy.ones(npoints)
             elif bs == "gauss":
                 if len(spl) != 3:
-                    raise ValueError("gaussian needs 2 params")
+                    errstr = "gaussian needs 2 params in %s" % inputfile
+                    raise ValueError(errstr)
                 cent = float(spl[1])
                 fwhm = float(spl[2])
                 minval = cent - 3.0*fwhm

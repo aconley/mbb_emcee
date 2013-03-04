@@ -12,7 +12,7 @@ class likelihood(object) :
     """ Parameter order dictionary.  Lowercased."""
     _param_order = {'t': 0, 't/(1+z)': 0, 'beta': 1, 'lambda0': 2,
                     'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
-                    'alpha': 3, 'fnorm': 4}
+                    'alpha': 3, 'fnorm': 4, 'f500': 4}
 
     def __init__(self, photfile=None, covfile=None, covextn=0, 
                  wavenorm=500.0, noalpha=False, opthin=False,
@@ -84,16 +84,19 @@ class likelihood(object) :
         self._has_covmatrix = False
         if not photfile is None:
             self.read_phot(photfile)
+
             if not covfile is None :
                 if not isinstance(covfile, basestring):
                     raise TypeError("covfile must be string-like")
                 self.read_cov(covfile, extn=covextn)
+
+            # Reset normalization flux lower limit based on data
+            self._lowlim[4] = 1e-3 * self._flux.min()
+
         else:
             if not covfile is None:
                 raise Exception("Can't pass in covfile if no photfile")
 
-        # Reset normalization flux lower limit based on data
-        self._lowlim[4] = 1e-3 * self._flux.min()
 
         self._badval = float("-inf")
 
