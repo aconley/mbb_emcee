@@ -5,12 +5,10 @@ major, minor1, minor2, release, serial = sys.version_info
 
 if (major < 2) or (major == 2 and minor1 < 7):
     raise SystemExit("modified_blackbody_emcee requires Python 2.7 or later")
-if (major == 3):
-    raise SystemExit("modified_blackbody_emcee does not support Python 3")
 
 setup(
     name="mbb_emcee",
-    version="0.2.1",
+    version="0.3.0",
     author="Alexander Conley",
     author_email="alexander.conley@colorado.edu",
     packages=["mbb_emcee"],
@@ -26,6 +24,6 @@ setup(
         "Programming Language :: Python",
     ],
     requires = ['numpy (>1.5.0)', 'emcee (>1.0.0)', 'scipy (>0.8.0)', 
-                'astropy (>0.1.0)']
+                'astropy (>0.2.0)']
 )
 

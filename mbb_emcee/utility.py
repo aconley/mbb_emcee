@@ -1,6 +1,5 @@
 __all__ = ["isiterable"]
 
-
 def isiterable(obj):
     """Returns `True` if the given object is iterable."""
     import collections, numpy

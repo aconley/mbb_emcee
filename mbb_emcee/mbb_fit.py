@@ -1,12 +1,21 @@
+from __future__ import print_function
+
 import numpy as np
 import emcee
 import math
 import multiprocessing
-from modified_blackbody import modified_blackbody
-from likelihood import likelihood
+from .modified_blackbody import modified_blackbody
+from .likelihood import likelihood
 import copy
 
 __all__ = ["mbb_fit", "mbb_fit_results"]
+
+#hack for basestring
+try:
+    basestring
+except:
+    #Python 3
+    basestring = str
 
 ############################################################
 
@@ -207,7 +216,7 @@ class mbb_fit_results(object):
             (upidx, pval, pcnt)
         upval  = aint[upidx]
         return (mnval, upval-mnval, mnval-lowval)
-    
+
     def parameter_chain(self, param):
         """ Gets flattened chain for parameter
 
@@ -1397,9 +1406,9 @@ class mbb_fit(object):
             raise Exception("Data not read, needed to do fit")
 
         if verbose:
-            print "Starting fit"
+            print("Starting fit")
             if self.response_integrate:
-                print "Using response integration"
+                print("  Using response integration")
 
         # Make sure initial parameters are valid
         for i in range(5):
@@ -1422,7 +1431,7 @@ class mbb_fit(object):
             errmsg = "Invalid (non-positive) number of burn in steps: %d"
             raise ValueError(errmsg % nburn)
         if verbose:
-            print "Doing burn in with %d steps" % nburn
+            print("  Doing burn in with %d steps" % nburn)
         pos, prob, rstate = self.sampler.run_mcmc(p0, nburn)
 
         # Reset and do main fit
@@ -1431,25 +1440,25 @@ class mbb_fit(object):
             errmsg = "Invalid (non-positive) number of main chain steps: %d"
             raise ValueError(errmsg % nsteps)
         if verbose:
-            print "Doing main chain with %d steps" % nsteps
+            print("  Doing main chain with %d steps" % nsteps)
         st = self.sampler.run_mcmc(pos, nsteps, rstate0=rstate)
         self._sampled = True
 
         if verbose:
-            print "Fit complete"
-            print " Mean acceptance fraction:", \
-                np.mean(self.sampler.acceptance_fraction)
+            print("  Fit complete")
+            print("   Mean acceptance fraction:", 
+                  np.mean(self.sampler.acceptance_fraction))
             try :
                 acor = self.sampler.acor
-                print " Autocorrelation time: "
-                print "  Number of burn in steps (%d) should be larger than these" % \
-                    nburn
-                print "\tT:        %f" % acor[0]
-                print "\tbeta:     %f" % acor[1]
+                print("   Autocorrelation time: ")
+                print("    Number of burn in steps (%d) should be larger "
+                      "than these" % nburn)
+                print("\tT:        %f" % acor[0])
+                print("\tbeta:     %f" % acor[1])
                 if not self._opthin:
-                    print "\tlambda0:  %f" % acor[2]
+                    print("\tlambda0:  %f" % acor[2])
                 if not self._noalpha:
-                    print "\talpha:    %f" % acor[3]
-                print "\tfnorm:    %f" % acor[4]
+                    print("\talpha:    %f" % acor[3])
+                print("\tfnorm:    %f" % acor[4])
             except ImportError :
                 pass

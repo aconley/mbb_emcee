@@ -3,7 +3,7 @@ import numpy
 import scipy.optimize
 from scipy.special import lambertw
 
-from utility import isiterable
+from .utility import isiterable
 
 """Modified blackbody and blackbody SEDs"""
 

@@ -5,6 +5,7 @@ This works in the observer frame."""
 
 #Requires that numpy, scipy, emcee, asciitable, pyfits are installed
 
+from __future__ import print_function
 import numpy
 import mbb_emcee
 
@@ -60,7 +61,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=desc, epilog=epi,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('photfile',action='store',
-                    help="Text file holding photometry in microns, mJy, error")
+                        help="Text file holding photometry in microns, mJy, error")
     parser.add_argument('outfile',action='store',
                         help="File to pickle resulting chain to")
     parser.add_argument('-b','--burn',action='store',type=int,default=50,
@@ -266,7 +267,8 @@ if __name__ == "__main__":
 
     # Peak wavelength computation
     if parse_results.get_peaklambda:
-        if parse_results.verbose: print "Computing peak obs-frame wavelength"
+        if parse_results.verbose: 
+            print("Computing peak obs-frame wavelength")
         res.compute_peaklambda()
 
     # L_IR computation
@@ -275,8 +277,8 @@ if __name__ == "__main__":
             raise ValueError("Must provide redshift if computing L_IR")
         minwave = parse_results.lir_range[0]
         maxwave = parse_results.lir_range[1]
-        if parse_results.verbose: print "Computing L_IR (%0.1f-%0.1fum)" %\
-                (minwave, maxwave)
+        if parse_results.verbose: 
+            print("Computing L_IR (%0.1f-%0.1fum)" % (minwave, maxwave))
         res.compute_lir(wavemin=minwave, wavemax=maxwave, 
                         maxidx=parse_results.maxidx,
                         lumdist=parse_results.lumdist)
@@ -287,18 +289,20 @@ if __name__ == "__main__":
             raise ValueError("Must provide redshift if computing m_dust")
         kappa = parse_results.kappa[0]
         kappa_wave = parse_results.kappa[1]
-        if parse_results.verbose: print "Computing dust mass"
+        if parse_results.verbose: 
+            print("Computing dust mass")
         res.compute_dustmass(kappa=kappa, kappa_wave=kappa_wave, 
                              maxidx=parse_results.maxidx,
                              lumdist=parse_results.lumdist)
 
     #Summarize results
     if parse_results.verbose:
-        print "Fit results:"
-        print res
+        print("Fit results:")
+        print(res)
 
 
     #Save output
-    if parse_results.verbose : print "Saving results"
+    if parse_results.verbose : 
+        print("Saving results to %s" % parse_results.outfile)
     with open(parse_results.outfile,'wb') as fl:
         pickle.dump(res, fl)

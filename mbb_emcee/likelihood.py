@@ -1,10 +1,17 @@
 import numpy as np
 import math
-from modified_blackbody import modified_blackbody
-from response import response, response_set
+from .modified_blackbody import modified_blackbody
+from .response import response, response_set
 import astropy.cosmology
 
 __all__ = ["likelihood"]
+
+#hack for basestring
+try:
+    basestring
+except:
+    #Python 3
+    basestring = str
 
 """Class holding data, defining likelihood"""
 class likelihood(object) :
@@ -169,7 +176,7 @@ class likelihood(object) :
             for name in firstarg:
                 # Do it this way to provide a more helpful error message
                 # if name is not known
-                if not self._responsewheel.has_key(name):
+                if not name in self._responsewheel:
                     raise ValueError("Unknown filter response %s" % name)
                 self._responses.append(self._responsewheel[name])
 
@@ -262,7 +269,7 @@ class likelihood(object) :
     def has_response(self, name):
         """ Is the specified response function available?"""
         if not hasattr(self, '_responsewheel'): return False
-        return self._responsewheel.has_key(name)
+        return name in self._responsewheel
 
     def get_response(self, name):
         """ Return the matching response object"""

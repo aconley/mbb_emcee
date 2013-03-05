@@ -6,6 +6,13 @@ import os.path
 
 __all__ = ["response", "response_set"]
 
+#hack for basestring
+try:
+    basestring
+except:
+    #Python 3
+    basestring = str
+
 def response_bb(freq, temperature):
     """Evaluates blackbody fnu at specified frequency and temperature
 
@@ -446,35 +453,18 @@ class response_set(object):
     def keys(self):
         return self._responses.keys()
 
-    def viewkeys(self):
-        return self._responses.viewkeys()
-
-    def has_key(self, val):
-        return self._responses.has_key(val)
-
-    def iterkeys(self):
-        return self._responses.iterkeys()
+    # in
+    def __contains__(self, val):
+        return val in self._responses
 
     def items(self):
         return self._responses.items()
 
-    def iteritems(self):
-        return self._responses.iteritems()
-
-    def viewitems(self):
-        return self._responses.viewitems()
-
-    def viewvalues(self):
-        return self._responses.viewvalues()
-
-    def itervalues(self):
-        return self._responses.itervalues()
-
-    def contains(self, val):
-        return self._responses.contains(val)
+    def values(self):
+        return self._responses.values()
 
     def delitem(self, val):
-        return self._responses.delitem(val)
+        del self._responses[val]
 
     def clear(self):
         return self._respones.clear()
