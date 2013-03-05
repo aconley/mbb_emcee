@@ -716,10 +716,12 @@ class mbb_fit_results(object):
 
         Returns
         -------
-        sample : tuple of ndarray
+        sample : tuple
           A tuple with the set of parameters as a 5 by nsamples array.
           If getpeaklambda, getlir, or getdustmass are set, additional
           ndarrays of length nsamples are appended, in that order.
+          These are flattened into a 5 element array and floats if
+          nsamples is 1.
         """
 
         if nsamples == 0:
@@ -727,39 +729,56 @@ class mbb_fit_results(object):
 
         #Make sure things are calculated
         if getpeaklambda and not self._has_peaklambda:
-            raise Error("Peak lambda not computed")
+            raise Exception("Peak lambda not computed")
         if getlir and not self._has_lir:
-            raise Error("LIR not computed")
+            raise Exception("LIR not computed")
         if getdustmass and not self._has_dustmass:
-            raise Error("Dustmass not computed")
+            raise Exception("Dustmass not computed")
 
-        # Set up output
-        rettup = (np.empty((nsamples, 5), dtype=np.float64),)
-        runidx = 1
-        if getpeaklambda:
-            peakidx = runidx
-            rettup += (np.empty(nsamples, dtype=np.float64),)
-            runidx += 1
-        if getlir:
-            liridx = runidx
-            rettup += (np.empty(nsamples, dtype=np.float64),)
-            runidx += 1
-        if getdustmass:
-            dustidx = runidx
-            rettup += (np.empty(nsamples, dtype=np.float64),)
-        
-        # Generate index into chain
-        for idx in range(nsamples):
+        if nsamples == 1:
+            # It's ugly, but still cleaner to do this in two branches
+            #  depending on nsamples
+
+            # Generate index into chain
             idx_walker = np.random.randint(0, self.chain.shape[0])
             idx_step = np.random.randint(0, self.chain.shape[1])
 
-            rettup[0][idx, :] = self.chain[idx_walker, idx_step, :]
+            # Get samples at that index
+            rettup = (self.chain[idx_walker, idx_step, :],)
             if getpeaklambda:
-                rettup[peakidx][idx] = self.peaklambda[idx_walker, idx_step]
+                rettup += (self.peaklambda[idx_walker, idx_step],)
             if getlir:
-                rettup[liridx][idx] = self.lir[idx_walker, idx_step]
+                rettup += (self.lir[idx_walker, idx_step],)
             if getdustmass:
-                rettup[dustidx][idx] = self.dustmass[idx_walker, idx_step]
+                rettup += (self.dustmass[idx_walker, idx_step],)
+        else:
+            #Multi-sample case
+            rettup = (np.empty((nsamples, 5), dtype=np.float64),)
+            runidx = 1
+            if getpeaklambda:
+                peakidx = runidx
+                rettup += (np.empty(nsamples, dtype=np.float64),)
+                runidx += 1
+            if getlir:
+                liridx = runidx
+                rettup += (np.empty(nsamples, dtype=np.float64),)
+                runidx += 1
+            if getdustmass:
+                dustidx = runidx
+                rettup += (np.empty(nsamples, dtype=np.float64),)
+
+            # Generate index into chain
+            for idx in range(nsamples):
+                idx_walker = np.random.randint(0, self.chain.shape[0])
+                idx_step = np.random.randint(0, self.chain.shape[1])
+
+                rettup[0][idx, :] = self.chain[idx_walker, idx_step, :]
+                if getpeaklambda:
+                    rettup[peakidx][idx] = self.peaklambda[idx_walker, idx_step]
+                if getlir:
+                    rettup[liridx][idx] = self.lir[idx_walker, idx_step]
+                if getdustmass:
+                    rettup[dustidx][idx] = self.dustmass[idx_walker, idx_step]
 
         return rettup
 
@@ -788,8 +807,9 @@ class mbb_fit_results(object):
 
         if isinstance(spec, basestring):
             if not self.like._response_integrate:
-                raise Error("Asked for response integration, but no "
-                            " response functions available from original fit")
+                raise Exception("Asked for response integration, but no "
+                                "response functions available from original "
+                                "fit")
             if not self.like.has_response(spec):
                 raise ValueError("Do not have response function matching %s" % spec)
             resp = self.like.get_response(spec)
