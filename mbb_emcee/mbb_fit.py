@@ -692,6 +692,76 @@ class mbb_fit_results(object):
                     prevstep = currstep
 
         self._has_dustmass = True
+    
+    def choice(self, nsamples=1, getpeaklambda=False, getlir=False,
+               getdustmass=False):
+        """ Get a random sample from the parameter chain, returning
+        the parameters.
+
+        Parameters
+        ----------
+        nsamples : int
+          Number of samples to generate.
+
+        getpeaklambda : bool
+          If true, adds peaklambda sample, returning a tuple
+
+        getlir : bool
+          If true, adds lir sample, returning a tuple.  Peaklambda
+          is added first
+        
+        getdustmass : bool
+          If true, adds a dustmass sample.  Peaklambda and lir are added
+          first.
+
+        Returns
+        -------
+        sample : tuple of ndarray
+          A tuple with the set of parameters as a 5 by nsamples array.
+          If getpeaklambda, getlir, or getdustmass are set, additional
+          ndarrays of length nsamples are appended, in that order.
+        """
+
+        if nsamples == 0:
+            return None
+
+        #Make sure things are calculated
+        if getpeaklambda and not self._has_peaklambda:
+            raise Error("Peak lambda not computed")
+        if getlir and not self._has_lir:
+            raise Error("LIR not computed")
+        if getdustmass and not self._has_dustmass:
+            raise Error("Dustmass not computed")
+
+        # Set up output
+        rettup = (np.empty((nsamples, 5), dtype=np.float64),)
+        runidx = 1
+        if getpeaklambda:
+            peakidx = runidx
+            rettup += (np.empty(nsamples, dtype=np.float64),)
+            runidx += 1
+        if getlir:
+            liridx = runidx
+            rettup += (np.empty(nsamples, dtype=np.float64),)
+            runidx += 1
+        if getdustmass:
+            dustidx = runidx
+            rettup += (np.empty(nsamples, dtype=np.float64),)
+        
+        # Generate index into chain
+        for idx in range(nsamples):
+            idx_walker = np.random.randint(0, self.chain.shape[0])
+            idx_step = np.random.randint(0, self.chain.shape[1])
+
+            rettup[0][idx, :] = self.chain[idx_walker, idx_step, :]
+            if getpeaklambda:
+                rettup[peakidx][idx] = self.peaklambda[idx_walker, idx_step]
+            if getlir:
+                rettup[liridx][idx] = self.lir[idx_walker, idx_step]
+            if getdustmass:
+                rettup[dustidx][idx] = self.dustmass[idx_walker, idx_step]
+
+        return rettup
 
     def _predict_flux(self, spec, maxidx=None):
         """ Predict flux density at a given wavelength from the fit
