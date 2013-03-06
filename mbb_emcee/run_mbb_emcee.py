@@ -44,11 +44,15 @@ if __name__ == "__main__":
       fnorm: The normalization flux in [mJy] in the observer frame (usually 
              at 500 [um], but this can be changed with --wavenorm)
 
-      Note that alpha and beta always have upper limits of 20, since larger 
-      values frequently cause overflows.  Lambda0 has an upper limit of
-      10 times the longest wavelength data point.  The user can override
-      all these limits, but not turn them off.
+     Note that alpha and beta always have upper limits of 20, since larger 
+     values frequently cause overflows.  Lambda0 has an upper limit of
+     10 times the longest wavelength data point.  The user can override
+     all these limits, but not turn them off.
 
+     In addition to setting upper and lower limits on the parameters, Gaussian
+     priors can be applied to each parameter.  Furthermore, a prior can be
+     applied on the wavelength of peak emission using the 'ghost' parameter
+     'lambda_peak'.
 
      By default the instrument responses are modeled as delta functions
      at the wavelengths in photfile.  However, if --responsefile is given,
@@ -141,6 +145,8 @@ if __name__ == "__main__":
                         default=None,help="Mean and sigma of Alpha prior")
     parser.add_argument('--priorFnorm',action="store",nargs=2,type=float,
                         default=None,help="Mean and sigma of fnorm prior")
+    parser.add_argument('--priorLambdaPeak',action="store",nargs=2,type=float,
+                        default=None,help="Mean and sigma of peak lambda prior")
     parser.add_argument('-r', '--responsefile', action="store", default=None,
                         help="Response specification file")
     parser.add_argument('--responsedir', action="store", default=None,
@@ -154,9 +160,11 @@ if __name__ == "__main__":
     parser.add_argument("--upAlpha",action='store',type=float,default=None,
                         help="Upper limit on alpha")
     parser.add_argument("--upLambda0",action='store',type=float,default=None,
-                        help="Upper limit on lambda0")
+                       help="Upper limit on lambda0")
     parser.add_argument("--upFnorm",action='store',type=float,default=None,
                         help="Upper limit on fnorm")
+    parser.add_argument("--upLambdaPeak",action='store',type=float,default=None,
+                       help="Upper limit on peak lambda")
     parser.add_argument("-v","--verbose",action="store_true",default=False,
                         help="Print status messages")
     parser.add_argument('-V','--version',action='version',
@@ -229,6 +237,8 @@ if __name__ == "__main__":
         fit.set_uplim('alpha',parse_results.upAlpha)
     if not parse_results.upFnorm is None : 
         fit.set_uplim('fnorm',parse_results.upFnorm)
+    if not parse_results.upLambdaPeak is None : 
+        fit.set_uplim('lambda_peak',parse_results.upLambdaPeak)
 
     # Priors
     if not parse_results.priorT is None:
@@ -246,6 +256,9 @@ if __name__ == "__main__":
     if not parse_results.priorFnorm is None:
         fit.set_gaussian_prior('Fnorm', parse_results.priorFnorm[0], 
                                parse_results.priorFnorm[1])
+    if not parse_results.priorLambdaPeak is None:
+        fit.set_gaussian_prior('lambda_peak', parse_results.priorLambdaPeak[0], 
+                               parse_results.priorLambdaPeak[1])
 
 
     # initial values -- T, beta, lambda0, alpha, fnorm

@@ -1026,7 +1026,8 @@ class mbb_fit(object):
     """ Parameter order dictionary.  Lowercased."""
     _param_order = {'t': 0, 't/(1+z)': 0, 'beta': 1, 'lambda0': 2,
                     'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
-                    'alpha': 3, 'fnorm': 4, 'f500': 4}
+                    'alpha': 3, 'fnorm': 4, 'f500': 4, 'lambda_peak': 5,
+                    'peaklam': 5}
 
     """ Parameter names"""
     _parnames = np.array(['T/(1+z)', 'Beta', 'Lambda0*(1+z)', 
@@ -1259,7 +1260,8 @@ class mbb_fit(object):
         param : int or string
           Parameter specification. Either an index into
           the parameter list, or a string name for the 
-          parameter.
+          parameter.  The peak lambda in microns (observer frame)
+          can also be used as a parameter (parameter 5, or 'lambda_peak')
         """
         self.like.set_uplim(param, val)
 
@@ -1308,7 +1310,9 @@ class mbb_fit(object):
         param : int or string
           Parameter specification.  Either an index into
           the parameter list, or a string name for the 
-          parameter.
+          parameter.  The peak lambda in microns (observer 
+          frame) can also be used as a parameter (parameter 5, 
+          or 'lambda_peak').
 
         mean : float
           Mean of Gaussian prior
@@ -1327,7 +1331,9 @@ class mbb_fit(object):
         param : int or string
           Parameter specification.  Either an index into
           the parameter list, or a string name for the 
-          parameter.
+          parameter.  The peak lambda in microns (observer 
+          frame) can also be used as a parameter (parameter 5, 
+          or 'lambda_peak').
           
         Returns
         -------
@@ -1345,7 +1351,9 @@ class mbb_fit(object):
         param : int or string
           Parameter specification.  Either an index into
           the parameter list, or a string name for the 
-          parameter.
+          parameter.  The peak lambda in microns (observer 
+          frame) can also be used as a parameter (parameter 5, 
+          or 'lambda_peak')
           
         Returns
         -------
@@ -1374,7 +1382,8 @@ class mbb_fit(object):
         -----
         This is only interesting because it has to obey parameter limits.
         As a consequence, the user-provided initial values may be ignored.
-        This will take care of fixed parameters correctly.
+        This will take care of fixed parameters correctly.  This ignores
+        the peak lambda upper limit.
         """
 
         import copy

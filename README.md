@@ -31,6 +31,9 @@ If picklefile is a string holding the name of the output file:
 	b_val = results.par_cen('beta')
 	print "Beta: {:0.2f}+{:0.2f}-{:0.2f}".format(*b_val)
 
+This package is compatable with Python 3, but in general pickle files
+written by Python 2.7 can't be read from Python 3 and vice versa.
+
 ###Dependencies
 This depends on a number of python packages:
 * [numpy](http://numpy.scipy.org/)

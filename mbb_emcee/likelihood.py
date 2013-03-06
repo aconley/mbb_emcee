@@ -1,8 +1,9 @@
 import numpy as np
 import math
+import astropy.cosmology
+import copy
 from .modified_blackbody import modified_blackbody
 from .response import response, response_set
-import astropy.cosmology
 
 __all__ = ["likelihood"]
 
@@ -68,18 +69,24 @@ class likelihood(object) :
         # so as long as we stay above that
         self._lowlim = np.array([1, 0.1, 1, 0.1, 1e-3])
 
-        # Setup upper limits; note that alpha and beta have
-        # upper limits by default
-        self._has_uplim = [False, True, False, True, False]
-        inf = float("inf")
-        self._uplim = np.array([inf, 20.0, inf, 20.0, inf])
+        # That includes setting up a dictionary that includes the
+        # lambda peak prior for gaussian priors and upper limits
+        self._limprior_order = copy.copy(self._param_order)
+        self._limprior_order.update({'lambda_peak': 5, 'peaklam': 5,
+                                     'lambdapeak': 5, 'peak_lambda': 5})
 
-        # Setup Gaussian prior
+        # Setup upper limits; note that alpha and beta have
+        # upper limits by default.  The last element is on the peak lambda
+        self._has_uplim = [False, True, False, True, False, False]
+        inf = float("inf")
+        self._uplim = np.array([inf, 20.0, inf, 20.0, inf, inf])
+
+        # Setup Gaussian prior on params plus peak lambda
         self._any_gprior = False
-        self._has_gprior = [False, False, False, False, False]
-        self._gprior_mean = np.zeros(5)
-        self._gprior_sigma = np.zeros(5)
-        self._gprior_ivar = np.ones(5)
+        self._has_gprior = [False, False, False, False, False, False]
+        self._gprior_mean = np.zeros(6)
+        self._gprior_sigma = np.zeros(6)
+        self._gprior_ivar = np.ones(6)
 
         # Responses
         self._response_integrate = False
@@ -450,7 +457,7 @@ class likelihood(object) :
         """
 
         if isinstance(param, str):
-            paramidx = self._param_order[param.lower()]
+            paramidx = self._limprior_order[param.lower()]
         else:
             paramidx = int(param)
 
@@ -474,7 +481,7 @@ class likelihood(object) :
           True if there is an upper limit, false otherwise
         """
         if isinstance(param, str):
-            paramidx = self._param_order[param.lower()]
+            paramidx = self._limprior_order[param.lower()]
         else:
             paramidx = int(param)
         
@@ -497,7 +504,7 @@ class likelihood(object) :
           Upper limit, or None if there isn't one
         """
         if isinstance(param, str):
-            paramidx = self._param_order[param.lower()]
+            paramidx = self._limprior_order[param.lower()]
         else:
             paramidx = int(param)
         
@@ -514,7 +521,9 @@ class likelihood(object) :
         param : int or string
           Parameter specification.  Either an index into
           the parameter list, or a string name for the 
-          parameter.
+          parameter.  The parameters are the usual (T, 
+          beta, lambda0, alpha, fnorm) plus the peak 
+          wavelength in microns
 
         mean : float
           Mean of Gaussian prior
@@ -524,7 +533,7 @@ class likelihood(object) :
         """
 
         if isinstance(param, str):
-            paramidx = self._param_order[param.lower()]
+            paramidx = self._limprior_order[param.lower()]
         else:
             paramidx = int(param)
 
@@ -543,7 +552,8 @@ class likelihood(object) :
         param : int or string
           Parameter specification.  Either an index into
           the parameter list, or a string name for the 
-          parameter.
+          parameter.  The parameters are the usual (T, beta, 
+          lambda0, alpha, fnorm) plus the peak wavelength in microns
           
         Returns
         -------
@@ -552,7 +562,7 @@ class likelihood(object) :
         """
         
         if isinstance(param, str):
-            paramidx = self._param_order[param.lower()]
+            paramidx = self._limprior_order[param.lower()]
         else:
             paramidx = int(param)
 
@@ -567,7 +577,8 @@ class likelihood(object) :
         param : int or string
           Parameter specification.  Either an index into
           the parameter list, or a string name for the 
-          parameter.
+          parameter.  The parameters are the usual (T, beta, 
+          lambda0, alpha, fnorm) plus the peak wavelength in microns
           
         Returns
         -------
@@ -578,7 +589,7 @@ class likelihood(object) :
         if not self._any_gprior: return None
 
         if isinstance(param, str):
-            paramidx = self._param_order[param.lower()]
+            paramidx = self._limprior_order[param.lower()]
         else:
             paramidx = int(param)
             
@@ -635,7 +646,11 @@ class likelihood(object) :
         For values above the upper limit, applies a Gaussian
         penalty centered at the limit with sigma = limit range/50.0.
         A soft upper limit seems to work better than a hard one.
+        In addition to the actual fit parameters, it is possible to have
+        a prior on the peak lambda.
         """
+
+        # This should only be called if _set_sed has already been called
 
         if len(pars) != 5:
             raise ValueError("pars is not of expected length 5")
@@ -648,7 +663,51 @@ class likelihood(object) :
                     limvar = (0.02 * (lim - self._lowlim[idx]))**2
                     logpenalty -= 0.5*(val - lim)**2 / limvar
 
+        # Peak lambda
+        if self._has_uplim[5]:
+            val = self._sed.max_wave() # _set_sed had better have been called..
+            lim = self._uplim[5]
+            if val > lim:
+                limvar = (0.02 * (lim))**2
+                logpenalty -= 0.5*(val - lim)**2 / limvar
+
+
         return logpenalty
+
+    def _gprior(self,pars):
+        """ Gets log likelihood of Gaussian priors
+
+        Parameters
+        ----------
+        pars : array like
+          5 element list of parameters (T, beta, lambda0, alpha, fnorm).
+
+        Returns
+        -------
+        like_penalty : float
+         Penalty to apply to log likelihood based on these parameters.
+         This should be added to the log likelihood (that is, it is
+         negative).
+        """
+
+        # This should only be called if _set_sed has already been called
+
+        if not self._any_gprior:
+            return 0.0
+        
+        penalty = 0.0
+        # Parameter priors
+        for idx, val in enumerate(pars):
+            if self._has_gprior[idx]:
+                delta = val - self._gprior_mean[idx]
+                penalty -= 0.5 * self._gprior_ivar[idx] * delta**2
+
+        # Peak lambda prior
+        if self._has_gprior[5]:
+            delta = self._sed.max_wave() - self._gprior_mean[5]
+            penalty -= 0.5 * self._gprior_ivar[5] * delta**2
+        
+        return penalty
 
     def _set_sed(self, pars):
         """ Set up the SED for the provided parameters
@@ -729,10 +788,6 @@ class likelihood(object) :
 
         # Add Gaussian priors to likelihood
         if self._any_gprior:
-            for idx, val in enumerate(pars):
-                if self._has_gprior[idx]:
-                    delta = val - self._gprior_mean[idx]
-                    lnlike -= 0.5 * self._gprior_ivar[idx] * delta**2
+            lnlike += self._gprior(pars)
 
         return lnlike
-
