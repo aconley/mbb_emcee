@@ -393,15 +393,20 @@ class response(object):
         return "name: %s lambda_eff: %0gum" % (self._name, self._effective_wave)
 
 class response_set(object):
-    """ A set of instrument responses"""
+    """ A set of instrument responses.  Doesn't read in actual responses
+    until told to."""
     
-    def __init__(self, inputfile, dir=None):
+    def __init__(self, inputfile, dir=None, initread=True):
         """ Initialize response set.
 
         Parameters
         ----------
         inputfile : string
           Name of input file
+
+        initread : bool
+          Read in all responses on initialization.  Otherwise only
+          reads them when needed.
         """
 
         import astropy.io.ascii
@@ -421,17 +426,32 @@ class response_set(object):
                                          comment='^#')
         if len(data) == 0 :
             raise IOError("No data read from %s" % inputfile)
+        self._response_dir = dir
 
-        self._responses = {}
+        # Keep a dictionary of the information we need to set up
+        # each filter -- but don't read them in yet
+        self._response_spec = {}
         for dat in data:
             name = dat[0]
-            self._responses[name] = response(name, dat[1], dat[2].lower(),
-                                             dat[3].lower(), dat[4].lower(),
-                                             dat[5].lower(), float(dat[6]), 
-                                             float(dat[7]), dir=dir)
+            self._response_spec[name] = (dat[1], dat[2].lower(),
+                                         dat[3].lower(), dat[4].lower(),
+                                         dat[5].lower(), float(dat[6]), 
+                                         float(dat[7]))
+        self._responses = {}
+        if initread:
+            self.read_all()
+
+    def read_all(self):
+        """ Reads in all responses not already read"""
+        for name in self._response_spec:
+            if not name in self._responses:
+                tup = self._response_spec[name]
+                self._responses[name] = response(name, tup[0], tup[1], tup[2],
+                                                 tup[3], tup[4], tup[5],
+                                                 tup[6], dir=self._response_dir)
 
     def __getitem__(self, name):
-        """ Get response with a specified name
+        """ Get response with a specified name, reading if necessary
 
         Parameters
         ----------
@@ -443,28 +463,43 @@ class response_set(object):
         resp : response
           Class object giving response function.
         """
-        return self._responses[name]
-
-    def setitem(self, val):
-        if not isinstance(val, response):
-            raise ValueError("Val not of type mbb_emcee.response")
-        return self._responses.setitem(val)
+        if name in self._responses:
+            # Already read
+            return self._responses[name]
+        else:
+            if name in self._response_spec:
+                # Read it
+                tup = self._response_spec[name]
+                self._responses[name] = response(name, tup[0], tup[1], tup[2],
+                                                 tup[3], tup[4], tup[5],
+                                                 tup[6], dir=self._response_dir)
+                return self._responses[name]
+            else:
+                # Don't know it
+                raise KeyError("Unknown filter response: %s" % s)
 
     def keys(self):
-        return self._responses.keys()
+        """ Includes only stuff actually read in"""
+        return self._response.keys()
 
     # in
     def __contains__(self, val):
-        return val in self._responses
-
+        """ Includes stuff not yet read in"""
+        return val in self._response_spec
+    
     def items(self):
+        """ Returns responses that are currently read in"""
         return self._responses.items()
 
     def values(self):
+        """ Returns responses names are currently read in"""
         return self._responses.values()
 
     def delitem(self, val):
         del self._responses[val]
 
     def clear(self):
+        """ Clears read in responses, but keeps information to reread them"""
         return self._respones.clear()
+
+    
