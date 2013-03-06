@@ -199,9 +199,9 @@ class likelihood(object) :
 
         self._flux = np.asarray(flux)
         self._flux_unc = np.asarray(flux_unc)
-        if len(self._wave) != len(self._flux):
+        if self._ndata != len(self._flux):
             raise ValueError("wave not same length as flux")
-        if len(self._wave) != len(self._flux_unc):
+        if self._ndata != len(self._flux_unc):
             raise ValueError("wave not same length as flux_unc")
         self._ivar = 1.0 / self._flux_unc**2
 
@@ -326,12 +326,13 @@ class likelihood(object) :
             raise ValueError("Covariance matrix is not 2 dimensional")
 
         if covmatrix.shape[0] != covmatrix.shape[1]:
-            raise ValueError("Covariance matrix from is not square")
+            errstr = "Covariance matrix from is not square: %d by %d"
+            raise ValueError(errstr % covmatrix.shape)
         
-        if covmatrix.shape[0] != len(self._flux):
+        if covmatrix.shape[0] != self._ndata:
             errstr = "Covariance matrix doesn't have same number of "+\
-                "datapoints as photometry"
-            raise ValueError(errstr)
+                "datapoints as photometry; %d vs. %d"
+            raise ValueError(errstr % (covmatrix.shape[0], self._ndata))
 
         self._covmatrix = covmatrix
         self._invcovmatrix = np.linalg.inv(self._covmatrix)
@@ -540,7 +541,7 @@ class likelihood(object) :
         self._any_gprior = True
         self._has_gprior[paramidx] = True
         self._gprior_mean[paramidx] = float(mean)
-        self._gprior_sigma = float(sigma)
+        self._gprior_sigma[paramidx] = float(sigma)
         self._gprior_ivar[paramidx] = 1.0 / (float(sigma)**2)
 
     def has_gaussian_prior(self, param):

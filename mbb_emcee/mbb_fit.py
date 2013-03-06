@@ -952,6 +952,16 @@ class mbb_fit_results(object):
         else:
             retstr += "Alpha not used\n"
         
+        # Lambda peak prior
+        if self.like.has_uplim(5) or self.like.has_gaussian_prior(5):
+            retstr += "Lambda_peak"
+            if self.like.has_uplim(5):
+                retstr += " upper lim: %0.2f" % self.like.uplim(5)
+            if self.like.has_gaussian_prior(5):
+                retstr += " prior: %0.2f %0.2f" %\
+                        self.like.get_gaussian_prior(5)
+            retstr += "\n"
+            
         retstr += "Number of data points: %d\n" % self.like.ndata
         retstr += "ChiSquare of best fit point: %0.2f" % self.best_fit_chisq
 

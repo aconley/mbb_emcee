@@ -39,7 +39,7 @@ This depends on a number of python packages:
 * [numpy](http://numpy.scipy.org/)
 * [scipy](http://numpy.scipy.org/)
 * [astropy](http://www.astropy.org/)
-* And, perhaps most importantly, [emcee](http://http://danfm.ca/emcee/)
+* And, perhaps most importantly, [emcee](http://dan.iel.fm/emcee/)
 
 ### References
 * The affine invariant MCMC code is described in
