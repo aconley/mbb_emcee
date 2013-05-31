@@ -476,11 +476,11 @@ class response_set(object):
                 return self._responses[name]
             else:
                 # Don't know it
-                raise KeyError("Unknown filter response: %s" % s)
+                raise KeyError("Unknown filter response: %s" % name)
 
     def keys(self):
         """ Includes only stuff actually read in"""
-        return self._response.keys()
+        return self._responses.keys()
 
     # in
     def __contains__(self, val):

@@ -4,7 +4,7 @@ import sys
 major, minor1, minor2, release, serial = sys.version_info
 
 if (major < 2) or (major == 2 and minor1 < 7):
-    raise SystemExit("modified_blackbody_emcee requires Python 2.7 or later")
+    raise SystemExit("mbb_emcee requires Python 2.7 or later")
 
 setup(
     name="mbb_emcee",
