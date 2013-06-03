@@ -4,6 +4,7 @@ import scipy.optimize
 from scipy.special import lambertw
 
 from .utility import isiterable
+import fnu 
 
 """Modified blackbody and blackbody SEDs"""
 
@@ -486,6 +487,48 @@ class modified_blackbody(object):
                 retval *= self._normfac
         return retval
 
+    def _f_nu_c(self, freq):
+        """Evaluate modifed blackbody at specified frequencies.
+        This internal version makes various assumptions about freq
+
+        Parameters
+        ----------
+        freq : array_like
+          Input frequencies, in GHz
+
+        Returns
+        -------
+        fnu : ndarray, or float if input scalar
+          The flux density in mJy
+        """
+
+        # Convert to some form of numarray
+        if not isiterable(freq):
+            frequency = numpy.asarray([freq], dtype=numpy.float64)
+        else:
+            frequency = numpy.asanyarray(freq, dtype=numpy.float64)
+
+        if self._opthin:
+            if not self._hasalpha:
+                retval = fnu.fnueval_thin_noalpha(frequency, self._T,
+                                                  self._beta, self._normfac)
+            else:
+                retval = fnu.fnueval_thin_walpha(frequency, self._T,
+                                                 self._beta, self._alpha,
+                                                 self._normfac, self._xmerge,
+                                                 self._kappa)
+        else:
+            if not self._hasalpha:
+                retval = fnu.fnueval_thick_noalpha(frequency, self._T,
+                                                   self._beta, self._x0,
+                                                   self._normfac)
+            else :
+                retval = fnu.fnueval_thick_walpha(frequency, self._T,
+                                                  self._beta, self._x0,
+                                                  self._alpha, self._normfac, 
+                                                  self._xmerge, self._kappa)
+        return retval
+
     def __call__(self, wave):
         """ Evaluate modified blackbody at specified wavelengths
 
@@ -503,8 +546,7 @@ class modified_blackbody(object):
         c = 299792458e-3 #The microns to GHz conversion
         wviter = isiterable(wave)
         if wviter:
-            wave = numpy.asanyarray(wave, dtype=numpy.float)
-            return self.f_nu(c / wave)
+            return self._f_nu_c(c/numpy.asanyarray(wave, dtype=numpy.float64))
         else:
             return self.f_nu(c / float(wave))
 

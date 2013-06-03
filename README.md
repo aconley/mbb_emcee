@@ -7,7 +7,7 @@ data using an affine invariant MCMC.
 ###Installation
 The usual
 
-	python setup.py install
+	python setup.py build install
 
 ###Usage
 The command line routine is
