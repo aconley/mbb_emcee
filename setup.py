@@ -15,7 +15,7 @@ ext_modules = [Extension("fnu", ["mbb_emcee/fnu.pyx"],
 
 setup(
     name="mbb_emcee",
-    version="0.3.0",
+    version="0.4.0",
     author="Alexander Conley",
     author_email="alexander.conley@colorado.edu",
     packages=["mbb_emcee"],
@@ -31,7 +31,7 @@ setup(
         "Programming Language :: Python",
     ],
     requires = ['numpy (>1.5.0)', 'emcee (>1.0.0)', 'scipy (>0.8.0)', 
-                'astropy (>0.2.0)', 'cython (>0.11.0)'],
+                'astropy (>0.2.0)', 'cython (>0.11.0)', 'h5py (>2.0.0)'],
     cmdclass = {'build_ext': build_ext},
     ext_modules = ext_modules
 )

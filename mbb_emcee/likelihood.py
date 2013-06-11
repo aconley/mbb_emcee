@@ -512,6 +512,13 @@ class likelihood(object) :
         if not self._has_uplim[paramidx]: return None
         return self._uplim[paramidx]
 
+    @property
+    def has_uplims(self):
+        return self._has_uplim
+    
+    @property
+    def uplims(self):
+        return self._uplim
 
     def set_gaussian_prior(self, param, mean, sigma):
         """Sets up a Gaussian prior on the specified parameter.
@@ -543,6 +550,22 @@ class likelihood(object) :
         self._gprior_mean[paramidx] = float(mean)
         self._gprior_sigma[paramidx] = float(sigma)
         self._gprior_ivar[paramidx] = 1.0 / (float(sigma)**2)
+
+    @property
+    def has_gpriors(self):
+        return self._has_gprior
+
+    @property
+    def gprior_means(self):
+        return self._gprior_mean
+    
+    @property
+    def gprior_sigmas(self):
+        return self._gprior_sigma
+
+    @property
+    def gprior_ivars(self):
+        return self._gprior_ivar
 
     def has_gaussian_prior(self, param):
         """ Does the given parameter have a Gaussian prior set?

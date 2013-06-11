@@ -67,7 +67,7 @@ if __name__ == "__main__":
     parser.add_argument('photfile',action='store',
                         help="Text file holding photometry in microns, mJy, error")
     parser.add_argument('outfile',action='store',
-                        help="File to pickle resulting chain to")
+                        help="File to write results to as HDF5")
     parser.add_argument('-b','--burn',action='store',type=int,default=50,
                         help="Number of burn-in steps to do (def: 50)")
     parser.add_argument('-c','--covfile',action='store',
@@ -197,14 +197,14 @@ if __name__ == "__main__":
     if (nwalkers <= 0) :
         raise ValueError("Invalid (non-positive) nwalkers: %d" % nwalkers)
 
-    fit = mbb_emcee.mbb_fit(nwalkers=nwalkers, photfile=photfile, 
-                            covfile=covfile,  covextn=parse_results.covextn,
-                            wavenorm=parse_results.wavenorm, 
-                            noalpha=parse_results.noalpha,
-                            opthin=parse_results.opthin, 
-                            nthreads=parse_results.threads,
-                            responsefile=parse_results.responsefile,
-                            responsedir=parse_results.responsedir)
+    fit = mbb_emcee.mbb_fitter(nwalkers=nwalkers, photfile=photfile, 
+                               covfile=covfile,  covextn=parse_results.covextn,
+                               wavenorm=parse_results.wavenorm, 
+                               noalpha=parse_results.noalpha,
+                               opthin=parse_results.opthin, 
+                               nthreads=parse_results.threads,
+                               responsefile=parse_results.responsefile,
+                               responsedir=parse_results.responsedir)
     
     # Set parameters fixed/limits if present
     if parse_results.fixT: fit.fix_param('T')
@@ -275,7 +275,7 @@ if __name__ == "__main__":
             verbose=parse_results.verbose)
 
     # Jam results into output structure
-    res = mbb_emcee.mbb_fit_results(fit, parse_results.redshift)
+    res = mbb_emcee.mbb_results(fit, parse_results.redshift)
     del fit
 
     # Peak wavelength computation
@@ -317,5 +317,4 @@ if __name__ == "__main__":
     #Save output
     if parse_results.verbose : 
         print("Saving results to %s" % parse_results.outfile)
-    with open(parse_results.outfile,'wb') as fl:
-        pickle.dump(res, fl)
+    res.writeToHDF5(parse_results.outfile)
