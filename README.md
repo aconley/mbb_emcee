@@ -52,5 +52,5 @@ This depends on a number of python packages:
   [Foreman-Mackey et al. (2012)](http://http://arxiv.org/abs/1202.3665)
 * This code has been used in a variety of HerMES papers analyzing
   the SEDs of dusty, star-forming galaxies:
-   ** [Riechers et al. (2013)](http://dx.doi.org/10.1038/nature12050)
-   ** [Fu et al. (2013)](http://arxiv.org/abs/1305.4930)
+  * [Riechers et al. (2013)](http://dx.doi.org/10.1038/nature12050)
+  * [Fu et al. (2013)](http://arxiv.org/abs/1305.4930)
