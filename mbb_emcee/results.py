@@ -21,7 +21,7 @@ except:
 
 ############################################################
 
-# This class holds the results.  Unlike mbb_fit, it can be
+# This class holds the results.  Unlike mbb_fitter, it can be
 # serialized.
 
 class mbb_results(object):
@@ -36,7 +36,7 @@ class mbb_results(object):
         """
         Parameters
         ----------
-        fit : mbb_fit
+        fit : mbb_fitter
           Fit object
           
         redshift : float
@@ -59,11 +59,15 @@ class mbb_results(object):
         self._has_peaklambda = False
             
         if not fit is None:
-            process_fit(fit)
+            self.process_fit(fit)
             
     def process_fit(self, fit):
-        if not isinstance(fit, mbb_fit):
+        """ Process the fit"""
+
+        if not isinstance(fit, mbb_fitter):
             raise ValueError("Input is not of type mbb_fit")
+
+        self._fitset = True
 
         # Fit specification
         self._noalpha = fit.noalpha
@@ -92,12 +96,12 @@ class mbb_results(object):
         self._data_flux = fit.like.data_flux
         if fit.like.has_data_covmatrix:
             self._has_covmatrix = True
-            self._covmatrix = fit.like.data_covmatrix()
-            self._invcovmatrix = fit.like.data_invcovmatrix()
-            self._data_flux_unc = fit.like.data_flux_unc() # diag of cov
+            self._covmatrix = fit.like.data_covmatrix
+            self._invcovmatrix = fit.like.data_invcovmatrix
+            self._data_flux_unc = fit.like.data_flux_unc # diag of cov
         else:
             self._has_covmatrix = False
-            self._data_flux_unc = fit.like.data_flux_unc()
+            self._data_flux_unc = fit.like.data_flux_unc
             if hasattr(self, '_covmatrix'):
                 del self._covmatrix
             if hasattr(self, '_invcovmatrix'):
@@ -108,7 +112,7 @@ class mbb_results(object):
         self.lnprobability = fit.sampler.lnprobability
 
         # Set up central values for all parameters
-        self.par_central_values = [self.par_cen(i) for i in range(5)]
+        self.par_central_values = np.array([self.par_cen(i) for i in range(5)])
 
         #Get the best fit point
         idxmax_flat = self.lnprobability.argmax()
@@ -131,8 +135,6 @@ class mbb_results(object):
         self._has_peaklambda = False
         if hasattr(self, 'peaklambda'):
             del self.peaklambda
-
-        self._fitset = True
 
     @property
     def redshift(self):
@@ -247,7 +249,7 @@ class mbb_results(object):
 
         Returns
         -------
-        tup : tuple
+        res : ndarray
           Mean, upper uncertainty, lower uncertainty.
         """
 
@@ -288,7 +290,7 @@ class mbb_results(object):
             "Invalid upper index %d for pval %f percentile %f" %\
             (upidx, pval, pcnt)
         upval  = aint[upidx]
-        return (mnval, upval-mnval, mnval-lowval)
+        return np.array([mnval, upval-mnval, mnval-lowval])
 
     def parameter_chain(self, param):
         """ Gets flattened chain for parameter
@@ -337,8 +339,8 @@ class mbb_results(object):
           
         Returns
         -------
-        tup : tuple
-          A tuple of the mean value, upper confidence limit,
+        ret : ndarray
+          A 3 element ndarray of the mean value, upper confidence limit,
           and lower confidence limit.
           Percentile of limit to compute
         """
@@ -441,8 +443,8 @@ class mbb_results(object):
 
         Returns
         -------
-        tup : tuple
-          A tuple of the central value, upper uncertainty, 
+        res: ndarray
+          A 3 element array of the central value, upper uncertainty, 
           and lower uncertainty of the peak observer frame
           wavelength in microns.
         """
@@ -516,8 +518,8 @@ class mbb_results(object):
 
         Returns
         -------
-        tup : tuple
-          A tuple of the central value, upper uncertainty, 
+        res : ndarray
+          A 3 element array of the central value, upper uncertainty, 
           and lower uncertainty of the IR luminosity (8-1000um)
           in 10^12 solar luminosities, or None if the L_IR has
           not been computed
@@ -641,19 +643,19 @@ class mbb_results(object):
 
         Parameters
         ----------
-        percentile : float
+        percentile: float
           The percentile to use when computing the uncertainties.
 
-        lowlim : float
+        lowlim: float
           Smallest value to allow in computation
 
-        uplim : float
+        uplim: float
           Largest value to allow in computation
 
         Returns
         -------
-        tup : tuple
-          A tuple of the central value, upper uncertainty, 
+        res: ndarray
+          A 3 element array of the central value, upper uncertainty, 
           and lower uncertainty of the dust mass in 10^8 solar masses,
           or None if not computed.
         """
@@ -966,8 +968,8 @@ class mbb_results(object):
 
         Returns
         -------
-        tup : tuple
-          A tuple of the central value, upper uncertainty, 
+        res : ndarray
+          A 3 element array of the central value, upper uncertainty, 
           and lower uncertainty of the predicted flux in mJy.
           If spec was a float, this is the sed flux at that value.  
           If it was a string, it is the response predicted for that 
@@ -1029,9 +1031,7 @@ class mbb_results(object):
 
         # Chain results
         gc = f.create_group("Chain")
-        gc.attrs["Params"] = ["T/(1+z)", "beta", "lambda0 (1+z)",
-                              "alpha", "fnorm"]
-        gc.attrs["ParamCentralValues"] = self.par_central_values
+        gc.create_dataset("ParamCentralValues", data=self.par_central_values)
         gc.create_dataset("Chain", data=self.chain)
         gc.create_dataset("LogLike", data=self.lnprobability)
         gc.create_dataset("BestFitParams", data=self._best_fit[0])
@@ -1098,11 +1098,11 @@ class mbb_results(object):
             if hasattr(self,"_invcovmatrix"): del self._invcovmatrix
 
         gc = f["Chain"]
-        self.par_central_values = gc["ParamCentralValues"]
+        self.par_central_values = gc["ParamCentralValues"][...]
         self.chain = gc["Chain"][...]
         self.lnprobability = gc["LogLike"][...]
         self._best_fit = (gc["BestFitParams"][...],gc["BestFitLogLike"][()],
-                          gc["BestFitIndex"[()]))
+                          gc["BestFitIndex"][()])
         
         ga = f["Ancillary"]
         if "Lir" in ga:
@@ -1141,7 +1141,8 @@ class mbb_results(object):
     def __str__(self):
         """ String representation of results"""
 
-        if not self._fitset: return ""
+        if not self._fitset: 
+            return "<Uninitialized mbb_results object>"
 
         idx = [0,1,4]
         tag = ["T/(1+z)","beta","fnorm"]
@@ -1150,10 +1151,13 @@ class mbb_results(object):
         
         for i,tg, unit in zip(idx, tag, units):
             retstr += "%s: " % tg
-            if self.fixed[i]:
+            if self._fixed[i]:
                 retstr += "%0.2f (fixed)\n" % self.chain[:,:,i].mean()
             else:
-                retstr += "%0.2f +%0.2f -%0.2f" % self.par_central_values[i]
+                retstr += "%0.2f +%0.2f -%0.2f" %\
+                    (self.par_central_values[i][0],
+                     self.par_central_values[i][1],
+                     self.par_central_values[i][2])
                 retstr += " (low lim: %0.2f" % self._lowlim[i]
                 if self._has_uplim[i]:
                     retstr += " upper lim: %0.2f" % self._uplim[i]
@@ -1168,7 +1172,9 @@ class mbb_results(object):
                     self.chain[:,:,2].mean()
             else:
                 retstr += "lambda0 (1+z): %0.2f +%0.2f -%0.2f" %\
-                    self.par_central_values[2]
+                    (self.par_central_values[2][0],
+                     self.par_central_values[2][1],
+                     self.par_central_values[2][2])
                 retstr += " (low lim: %0.2f" % self._lowlim[2]
                 if self._has_uplim[2]:
                     retstr += " upper lim: %0.2f" % self._uplim[2]
@@ -1184,7 +1190,9 @@ class mbb_results(object):
                 retstr += "alpha: %0.2f (fixed)\n" % self.chain[:,:,3].mean()
             else:
                 retstr += "alpha: %0.2f +%0.2f -%0.2f" %\
-                    self.par_central_values[3]
+                    (self.par_central_values[3][0],
+                     self.par_central_values[3][1],
+                     self.par_central_values[3][2])
                 retstr += " (low lim: %0.2f" % self._lowlim[3]
                 if self._has_uplim[3]:
                     retstr += " upper lim: %0.2f" % self._uplim[3]

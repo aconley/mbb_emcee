@@ -589,7 +589,7 @@ class response_set(object):
     # in
     def __contains__(self, val):
         """ Is a particular response available?"""
-        return val in self._response_spec
+        return val in self._responses
     
     def items(self):
         """ Get all responses"""

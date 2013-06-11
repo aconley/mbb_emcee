@@ -67,7 +67,7 @@ if __name__ == "__main__":
     parser.add_argument('photfile',action='store',
                         help="Text file holding photometry in microns, mJy, error")
     parser.add_argument('outfile',action='store',
-                        help="File to write results to as HDF5")
+                        help="File to write results (HDF5)")
     parser.add_argument('-b','--burn',action='store',type=int,default=50,
                         help="Number of burn-in steps to do (def: 50)")
     parser.add_argument('-c','--covfile',action='store',
