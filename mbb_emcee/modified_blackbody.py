@@ -59,12 +59,12 @@ class blackbody(object):
         return self._wavenorm
 
     def __repr__(self):
-        retstr = "blackbody(%.2g, %.2g, wavenorm=%.2g)"
-        return retstr % (self._T, self._fnorm, self._wavenorm)
+        retstr = "blackbody({:.2g}, {:.2g}, wavenorm={:.2g})"
+        return retstr.format(self._T, self._fnorm, self._wavenorm)
 
     def __str__(self):
-        retstr = "blackbody(T: %.2g fnorm: %.2g wavenorm: %.2g)"
-        return retstr % (self._T, self._fnorm, self._wavenorm)
+        retstr = "blackbody(T: {:.2g} fnorm: {:.2g} wavenorm: {:.2g})"
+        return retstr.format(self._T, self._fnorm, self._wavenorm)
 
     def f_nu(self, freq):
         """Evaluate blackbody at specified frequencies.
@@ -214,11 +214,11 @@ class modified_blackbody(object):
             self._lambda0 = float(lambda0)
             
         if self._hasalpha and alpha <= 0.0:
-            errmsg = "alpha must be positive.  You gave: %.5g" % self._alpha
-            raise ValueError(errmsg)
+            errmsg = "alpha must be positive.  You gave: {:.5g}"
+            raise ValueError(errmsg.format(self._alpha))
         if self._beta < 0.0:
-            errmsg = "beta must be non-negative.  You gave: %.5g" % self._beta
-            raise ValueError(errmsg)
+            errmsg = "beta must be non-negative.  You gave: {:.5g}"
+            raise ValueError(errmsg.format(self._beta))
 
         # Some constants -- eventually, replace these with
         # astropy.constants, but that is in development, so hardwire for now
@@ -290,11 +290,11 @@ class modified_blackbody(object):
                     aval = alpha_merge_eqn(a, self._alpha, self._beta, self._x0)
                     if iter > maxiters:
                         errmsg = "Couldn't bracket low alpha merge point for "\
-                            "T: %f beta: %f lambda0: %f alpha %f, "\
-                            "last a: %f value: %f"
-                        errmsg %= (self._T, self._beta, self._lambda0, 
-                                   self._alpha, a, aval)
-                        raise ValueError(errmsg)
+                            "T: {:f} beta: {:f} lambda0: {:f} alpha {:f}, "\
+                            "last a: {:f} value: {:f}"
+                        raise ValueError(errmsg.format(self._T, self._beta, 
+                                                       self._lambda0, 
+                                                       self._alpha, a, aval))
                     iter += 1
 
                 b = 15.0
@@ -305,11 +305,11 @@ class modified_blackbody(object):
                     bval = alpha_merge_eqn(b, self._alpha, self._beta, self._x0)
                     if iter > maxiters:
                         errmsg = "Couldn't bracket high alpha merge point for "\
-                            "T: %f beta: %f lambda0: %f alpha %f, "\
-                            "last b: %f value: %f"
-                        errmsg %= (self._T, self._beta, self._lambda0, 
-                                   self._alpha, b, bval)
-                        raise ValueError(errmsg)
+                            "T: {:f} beta: {:f} lambda0: {:f} alpha {:f}, "\
+                            "last a: {:f} value: {:f}"
+                        raise ValueError(errmsg.format(self._T, self._beta, 
+                                                       self._lambda0, 
+                                                       self._alpha, a, aval))
                     iter += 1
                     
                 # Now find root
@@ -385,52 +385,53 @@ class modified_blackbody(object):
     def __repr__(self):
         if self._hasalpha:
             if self._opthin:
-                retstr = "modified_blackbody(%.2g, %.2g, None, %.2g, %.2g," + \
-                    " opthin=True, wavenorm=%.2g)"
-                return retstr % (self._T, self._beta, self._alpha,
-                                 self._fnorm, self._wavenorm)
+                retstr = "modified_blackbody({:.2g}, {:.2g}, None, {:.2g}," + \
+                         "{:.2g}, opthin=True, wavenorm={:.2g})"
+                return retstr.format(self._T, self._beta, self._alpha,
+                                     self._fnorm, self._wavenorm)
             else:
-                retstr = "modified_blackbody(%.2g, %.2g, %.2g, %.2g, %.2g," + \
-                    " wavenorm=%.2g)"
-                return retstr % (self._T, self._beta, self.lambda0,
-                                 self.alpha, self._fnorm, self._wavenorm)
+                retstr = "modified_blackbody({:.2g}, {:.2g}, {:.2g}," + \
+                         " {:.2g}, {:.2g}, wavenorm={:.2g})"
+                return retstr.format(self._T, self._beta, self.lambda0,
+                                     self.alpha, self._fnorm, self._wavenorm)
         else:
             if self._opthin:
-                retstr = "modified_blackbody(%.2g, %.2g, None, None, %.2g," + \
-                    " noalpha=True, opthin=True, wavenorm=%.2g)"
-                return retstr % (self._T, self._beta, self._fnorm,
-                                 self._wavenorm)
+                retstr = "modified_blackbody({:.2g}, {:.2g}, None, None, " + \
+                         "{:.2g}, noalpha=True, opthin=True, wavenorm={:.2g})"
+                return retstr.format(self._T, self._beta, self._fnorm,
+                                     self._wavenorm)
             else:
-                retstr = "modified_blackbody(%.2g, %.2g, %.2g, None, %.2g," + \
-                    " noalpha=True, wavenorm=%.2g)"
-                return retstr % (self._T, self._beta, self.lambda0,
-                                 self._fnorm, self._wavenorm)
+                retstr = "modified_blackbody({:.2g}, {:.2g}, {:.2g}, None," + \
+                         " {:.2g}, noalpha=True, wavenorm={:.2g})"
+                return retstr.format(self._T, self._beta, self.lambda0,
+                                     self._fnorm, self._wavenorm)
 
 
     def __str__(self):
         if self._hasalpha:
             if self._opthin:
-                retstr = "modified_blackbody(T: %.2g beta: %.2g " + \
-                    "alpha: %.2g fnorm: %.2g wavenorm: %.2g)"
-                return retstr % (self._T, self._beta, self._alpha,
-                                 self._fnorm, self._wavenorm)
+                retstr = "modified_blackbody(T: {:.2g} beta: {:.2g} " + \
+                    "alpha: {:.2g} fnorm: {:.2g} wavenorm: {:.2g})"
+                return retstr.format(self._T, self._beta, self._alpha,
+                                     self._fnorm, self._wavenorm)
             else:
-                retstr = "modified_blackbody(T: %.2g beta: %.2g " + \
-                    "lambda0: %.2g alpha: %.2g fnorm: %.2g wavenorm: %.2g)"
-                return retstr % (self._T, self._beta, self.lambda0,
-                                 self._alpha, self._fnorm,
-                                 self._wavenorm)
+                retstr = "modified_blackbody(T: {:.2g} beta: {:.2g} " + \
+                    "lambda0: {:.2g} alpha: {:.2g} fnorm: {:.2g} " + \
+                    "wavenorm: {:.2g})"
+                return retstr.format(self._T, self._beta, self.lambda0,
+                                     self._alpha, self._fnorm,
+                                     self._wavenorm)
         else:
             if self._opthin:
-                retstr = "modified_blackbody(T: %.2g beta: %.2g " +\
-                    "fnorm: %.2g  wavenorm: %.2g)"
-                return retstr % (self._T, self._beta, self._fnorm,
-                                 self._wavenorm)
+                retstr = "modified_blackbody(T: {:.2g} beta: {:.2g} " +\
+                    "fnorm: {:.2g}  wavenorm: {:.2g})"
+                return retstr.format(self._T, self._beta, self._fnorm,
+                                     self._wavenorm)
             else:
-                retstr = "modified_blackbody(T: %.2g beta: %.2g " + \
-                    "lambda0: %.2g fnorm: %.2g  wavenorm: %.2g)"
-                return retstr % (self._T, self._beta, self.lambda0,
-                                 self._fnorm, self._wavenorm)  
+                retstr = "modified_blackbody(T: {:.2g} beta: {:.2g} " + \
+                    "lambda0: {:.2g} fnorm: {:.2g}  wavenorm: {:.2g})"
+                return retstr.format(self._T, self._beta, self.lambda0,
+                                     self._fnorm, self._wavenorm)  
 
     def f_nu(self, freq):
         """Evaluate modifed blackbody at specified frequencies.

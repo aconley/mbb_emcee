@@ -258,7 +258,7 @@ class mbb_results(object):
 
         pcnt = float(percentile)
         if pcnt < 0 or pcnt > 100:
-            raise ValueError("Invalid percentile %f" % pcnt)
+            raise ValueError("Invalid percentile {:f}".format(pcnt))
 
         aint = copy.deepcopy(array)
         
@@ -281,14 +281,8 @@ class mbb_results(object):
         pval = (1.0 - 0.01 * pcnt) / 2
         na = len(aint)
         lowidx = int(round(pval * na))
-        assert lowidx > 0 and lowidx < na, \
-            "Invalid lower index %d for pval %f percentile %f" %\
-            (lowidx, pval, pcnt)
         lowval = aint[lowidx]
         upidx = int(round((1.0 - pval) * na))
-        assert upidx > 0 and upidx < na, \
-            "Invalid upper index %d for pval %f percentile %f" %\
-            (upidx, pval, pcnt)
         upval  = aint[upidx]
         return np.array([mnval, upval-mnval, mnval-lowval])
 
@@ -313,7 +307,7 @@ class mbb_results(object):
         else:
             paridx = int(param)
             if paridx < 0 or paridx > 5:
-                raise ValueError("invalid parameter index %d" % paridx)
+                raise ValueError("invalid parameter index {:d}".format(paridx))
 
         return self.chain[:,:,paridx].flatten()
 
@@ -375,7 +369,7 @@ class mbb_results(object):
         else:
             paridx = int(param)
             if paridx < 0 or paridx > 5:
-                raise ValueError("invalid parameter index %d" % paridx)
+                raise ValueError("invalid parameter index {:d}".format(paridx))
 
         if percentile <= 0 or percentile >= 100.0:
             raise ValueError("percentile needs to be between 0 and 100")
@@ -407,7 +401,7 @@ class mbb_results(object):
         else:
             paridx = int(param)
             if paridx < 0 or paridx > 5:
-                raise ValueError("invalid parameter index %d" % paridx)
+                raise ValueError("invalid parameter index {:d}".format(paridx))
 
         if percentile <= 0 or percentile >= 100.0:
             raise ValueError("percentile needs to be between 0 and 100")
@@ -562,9 +556,9 @@ class mbb_results(object):
         self._lir_min = float(wavemin)
         self._lir_max = float(wavemax)
         if self._lir_min <= 0:
-            raise ValueError("Invalid wavemin: %f" % self._lir_min)
+            raise ValueError("Invalid wavemin: {:f}".format(self._lir_min))
         if self._lir_max <= 0:
-            raise ValueError("Invalid wavemax: %f" % self._lir_max)
+            raise ValueError("Invalid wavemax: {:f}".format(self._lir_max))
         # Get them in ascending order
         if self._lir_min > self._lir_max:
             self._lir_min, self._lir_max = self._lir_max, self._lir_min
@@ -574,15 +568,19 @@ class mbb_results(object):
         # 4 * pi * mpc_to_cm^2/L_sun
         if not lumdist is None:
             if self._z <= -1:
-                raise ValueError("Redshift is less than -1: %f" % self._z)
+                errmsg = "Redshift is less than -1: {:f}"
+                raise ValueError(errmsg.format(self._z))
             dl = float(lumdist)
             if dl <= 0.0:
-                raise ValueError("Invalid luminosity distance: %f" % dl)
+                raise ValueError("Invalid luminosity distance: {:f}".format(dl))
         else:
             if self._z <= 0:
-                raise ValueError("Redshift is invalid: %f" % self._z)
+                raise ValueError("Redshift is invalid: {:f}".format(self._z))
             import astropy.cosmology
+            import astropy.units as u
             dl = astropy.cosmology.WMAP9.luminosity_distance(self._z) #Mpc
+            if isinstance(dl, u.Quantity):
+                dl = dl.value
 
         lirprefac = 3.11749657e4 * dl**2 # Also converts to 10^12 lsolar
 
@@ -716,23 +714,29 @@ class mbb_results(object):
         self._kappa_wave = float(kappa_wave)
 
         if self._kappa <= 0:
-            raise ValueError("Invalid (non-positive) kappa %f" % self._kappa)
+            errmsg = "Invalid (non-positive) kappa {:f}"
+            raise ValueError(errmsg.format(self._kappa))
         if self._kappa_wave <= 0:
-            raise ValueError("Invalid (non-positive) kappa wavelength %f" % \
-                                 self._kappa_wave)
+            errmsg = "Invalid (non-positive) kappa wavelength {:f}"
+            raise ValueError(errmsg.format(self._kappa_wave))
         
         # Get luminosity distance
         if not lumdist is None:
             if self._z <= -1:
-                raise ValueError("Redshift is less than -1: %f" % self._z)
+                errmsg = "Redshift is less than -1: {:f}"
+                raise ValueError(errmsg.format(self._z))
             dl = float(lumdist)
             if dl <= 0.0:
-                raise ValueError("Invalid luminosity distance: %f" % dl)
+                errmsg = "Invalid luminosity distance: {:f}"
+                raise ValueError(errmsg.format(dl))
         else:
             if self._z <= 0:
-                raise ValueError("Redshift is invalid: %f" % self._z)
+                raise ValueError("Redshift is invalid: {:f}".format(self._z))
             import astropy.cosmology
+            import astropy.units as u
             dl = astropy.cosmology.WMAP9.luminosity_distance(self._z) #Mpc
+            if isinstance(dl, u.Quantity):
+                dl = dl.value
 
         mpc_to_cm = 3.08567758e24
         dl *= mpc_to_cm
@@ -897,13 +901,14 @@ class mbb_results(object):
                                 "response functions available from original "
                                 "fit")
             if not spec in self._responsewheel:
-                raise ValueError("Do not have response function matching %s" % spec)
+                errmsg  ="Do not have response function matching {:s}"
+                raise ValueError(errmsg.format(spec))
             resp = self._responsewheel[spec]
             doing_response = True
         else:
             wv = float(spec)
             if (wv <= 0):
-                raise ValueError("Invalid wavelength %f" % wv)
+                raise ValueError("Invalid wavelength {:f}".format(wv))
             doing_response = False
 
         # Do computation.  explicitly checking for repeats.
@@ -1081,8 +1086,8 @@ class mbb_results(object):
 
         if self._response_integrate:
             if not "Responses" in f:
-                raise ValueError("Didn't find expected "
-                                 "responses in %s" % filename)
+                errmsg = "Didn't find expected responses in {:s}"
+                raise ValueError(errmsg.format(filename))
             self._responsewheel = response_set()
             self._responsewheel.readFromHDF5(f["Responses"])
 
@@ -1150,55 +1155,59 @@ class mbb_results(object):
         retstr = ""
         
         for i,tg, unit in zip(idx, tag, units):
-            retstr += "%s: " % tg
+            retstr += "{:s}: ".format(tg)
             if self._fixed[i]:
-                retstr += "%0.2f (fixed)\n" % self.chain[:,:,i].mean()
+                retstr += "{:0.2f} (fixed)\n".format(self.chain[:,:,i].mean())
             else:
-                retstr += "%0.2f +%0.2f -%0.2f" %\
-                    (self.par_central_values[i][0],
-                     self.par_central_values[i][1],
-                     self.par_central_values[i][2])
-                retstr += " (low lim: %0.2f" % self._lowlim[i]
+                msg = "{:0.2f} +{:0.2f} -{:0.2f}"
+                retstr += msg.format(self.par_central_values[i][0],
+                                     self.par_central_values[i][1],
+                                     self.par_central_values[i][2])
+                retstr += " (low lim: {:0.2f}".format(self._lowlim[i])
                 if self._has_uplim[i]:
-                    retstr += " upper lim: %0.2f" % self._uplim[i]
+                    retstr += " upper lim: {:0.2f}".format(self._uplim[i])
                 if self._has_gprior[i]:
-                    retstr += " prior: %0.2f %0.2f" %\
-                        (self._gprior_mean[i], self._gprior_sigma[i])
-                retstr += ") %s\n" % unit
+                    msg = " prior: {:0.2f} {:0.2f}"
+                    retstr += msg.format(self._gprior_mean[i], 
+                                         self._gprior_sigma[i])
+                retstr += ") {:s}\n".format(unit)
 
         if not self._opthin:
             if self._fixed[2]:
-                retstr += "lambda0 (1+z): %0.2f (fixed) [um]\n" %\
-                    self.chain[:,:,2].mean()
+                val = self.chain[:,:,2].mean()
+                retstr += "lambda0 (1+z): {:0.2f} (fixed) [um]\n".format(val)
             else:
-                retstr += "lambda0 (1+z): %0.2f +%0.2f -%0.2f" %\
-                    (self.par_central_values[2][0],
-                     self.par_central_values[2][1],
-                     self.par_central_values[2][2])
-                retstr += " (low lim: %0.2f" % self._lowlim[2]
+                msg = "lambda0 (1+z): {:0.2f} +{:0.2f} -{:0.2f}"
+                retstr += msg.format(self.par_central_values[2][0],
+                                     self.par_central_values[2][1],
+                                     self.par_central_values[2][2])
+                retstr += " (low lim: {:0.2f}".format(self._lowlim[2])
                 if self._has_uplim[2]:
-                    retstr += " upper lim: %0.2f" % self._uplim[2]
+                    retstr += " upper lim: {:0.2f}".format(self._uplim[2])
                 if self._has_gprior[2]:
-                    retstr += " prior: %0.2f %0.2f" %\
-                        (self._gprior_mean[2], self._gprior_sigma[2])
+                    msg = " prior: {:0.2f} {:0.2f}"
+                    retstr += msg.format(self._gprior_mean[2], 
+                                         self._gprior_sigma[2])
                 retstr += ") [um]\n"
         else:
             retstr += "Optically thin case assumed\n"
 
         if not self._noalpha:
             if self._fixed[3]:
-                retstr += "alpha: %0.2f (fixed)\n" % self.chain[:,:,3].mean()
+                val = self.chain[:,:,3].mean()
+                retstr += "alpha: {:0.2f} (fixed)\n".format(val)
             else:
-                retstr += "alpha: %0.2f +%0.2f -%0.2f" %\
-                    (self.par_central_values[3][0],
-                     self.par_central_values[3][1],
-                     self.par_central_values[3][2])
-                retstr += " (low lim: %0.2f" % self._lowlim[3]
+                msg = "alpha: {:0.2f} +{:0.2f} -{:0.2f}"
+                retstr += msg.format(self.par_central_values[3][0],
+                                     self.par_central_values[3][1],
+                                     self.par_central_values[3][2])
+                retstr += " (low lim: {:0.2f}".format(self._lowlim[3])
                 if self._has_uplim[3]:
-                    retstr += " upper lim: %0.2f" % self._uplim[3]
+                    retstr += " upper lim: {:0.2f}".format(self._uplim[3])
                 if self._has_gprior[3]:
-                    retstr += " prior: %0.2f %0.2f" %\
-                        (self._gprior_mean[3], self._gprior_sigma[3])
+                    msg = " prior: {:0.2f} {:0.2f}"
+                    retstr += msg.format(self._gprior_mean[3], 
+                                         self._gprior_sigma[3])
                 retstr += ")\n"
         else:
             retstr += "Alpha not used\n"
@@ -1207,14 +1216,15 @@ class mbb_results(object):
         if self._has_uplim[5] or self._has_gprior[5]:
             retstr += "Lambda_peak"
             if self._has_uplim[5]:
-                retstr += " upper lim: %0.2f" % self._uplim[5]
+                retstr += " upper lim: {:0.2f}".format(self._uplim[5])
             if self._has_gprior[5]:
-                retstr += " prior: %0.2f %0.2f" %\
-                    (self._gprior_mean[5], self._gprior_sigma[5])
+                msg = " prior: {:0.2f} {:0.2f}"
+                retstr += msg.format(self._gprior_mean[5], 
+                                     self._gprior_sigma[5])
             retstr += "\n"
             
-        retstr += "Number of data points: %d\n" % self._ndata
-        retstr += "ChiSquare of best fit point: %0.2f" % self.best_fit_chisq
+        retstr += "Number of data points: {:d}\n".format(self._ndata)
+        retstr += "ChiSquare of best fit point: {:0.2f}".format(self.best_fit_chisq)
 
         return retstr
 
@@ -1252,11 +1262,14 @@ class mbb_freqint(object):
         self._noalpha = bool(noalpha)
 
         if self._redshift < 0:
-            raise Exception("Invalid (negative) redshift: %f" % self._redshift)
+            errmsg = "Invalid (negative) redshift: {:f}"
+            raise Exception(errmsg.format(self._redshift))
         if self._lammin <= 0:
-            raise Exception("Invalid (non-positive) lammin: %f" % self._lammin)
+            errmsg = "Invalid (non-positive) lammin: {:f}"
+            raise Exception(errmsg.format(self._lammin))
         if self._lammax <= 0:
-            raise Exception("Invalid (non-positive) lammax: %f" % self._lammax)
+            errmsg = "Invalid (non-positive) lammax: {:f}"
+            raise Exception(errmsg.format(self._lammax))
         if self._lammin > self._lammax:
             self._lammin, self._lammax = self._lammax, self._lammin            
 

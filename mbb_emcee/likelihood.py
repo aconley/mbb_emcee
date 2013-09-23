@@ -1,6 +1,5 @@
 import numpy as np
 import math
-import astropy.cosmology
 import copy
 from .modified_blackbody import modified_blackbody
 from .response import response, response_set

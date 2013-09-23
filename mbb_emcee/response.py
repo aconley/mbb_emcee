@@ -138,7 +138,8 @@ class response(object):
                 return
             elif bs == "box":
                 if len(spl) != 3:
-                    raise ValueError("box car needs 2 params in %s" % inputspec)
+                    errmsg = "box car needs 2 params in {:s}"
+                    raise ValueError(errmsg.format(inputspec))
                 cent = float(spl[1])
                 width = float(spl[2])
                 npoints = 11
@@ -148,8 +149,8 @@ class response(object):
                 self._resp = numpy.ones(npoints)
             elif bs == "gauss":
                 if len(spl) != 3:
-                    errstr = "gaussian needs 2 params in %s" % inputspec
-                    raise ValueError(errstr)
+                    errstr = "gaussian needs 2 params in {:s}"
+                    raise ValueError(errstr.format(inputspec))
                 cent = float(spl[1])
                 fwhm = float(spl[2])
                 minval = cent - 3.0*fwhm
@@ -164,13 +165,14 @@ class response(object):
                 #A real file -- read it
                 if dir is None:
                     data = astropy.io.ascii.read(inputspec, comment='^#')
-                    if len(data) == 0 :
-                        raise IOError("No data read from %s" % inputspec)
+                    if len(data) == 0:
+                        errmsg = "No data read from {:s}"
+                        raise IOError(errmsg.format(inputspec))
                 else:
                     infile = os.path.join(dir, inputspec)
                     data = astropy.io.ascii.read(infile, comment='^#')
-                    if len(data) == 0 :
-                        raise IOError("No data read from %s" % infile)
+                    if len(data) == 0:
+                        raise IOError("No data read from {:s}".format(infile))
 
                 xvals = numpy.asarray([dat[0] for dat in data])
                 self._resp = numpy.asarray([dat[1] for dat in data])
@@ -195,7 +197,8 @@ class response(object):
                 self._wave = 1e6 * xvals
                 self._normwave = 1e6 * xnorm
             else:
-                raise ValueError("Unrecognized wavelength type %s" % xtype)
+                errmsg = "Unrecognized wavelength type {:s}"
+                raise ValueError(errmsg.format(xtype))
             self._freq = 299792458e-3 / self._wave #In GHz
             self._normfreq = 299792458e-3 / self._normwave
         elif xtyp == 'freq':
@@ -228,7 +231,7 @@ class response(object):
         elif styp == "counts":
             self._sens_energy = False
         else:
-            raise ValueError("Unknown sensitivity type %s" % senstype)
+            raise ValueError("Unknown sensitivity type {:s}".format(senstype))
 
         # This is a convenience array for integrations, consisting of
         # the response times the delta freq factor to sum over
@@ -274,13 +277,14 @@ class response(object):
                 # Rather more complicated
                 self._normparam = float(normparam)
                 if self._normparam <= 0.0:
-                    errmsg = "Invalid (non-positive) blackbody temperature %f"
-                    raise ValueError(errmsg % self._normparam)
+                    errmsg = "Invalid (non-positive) blackbody temperature {:f}"
+                    raise ValueError(errmsg.format(self._normparam))
                 # Blackbody curve, normalized at normfreq
                 sed = response_bb(self._freq, self._normparam) /\
                     response_bb(self._normfreq, self._normparam)
             else:
-                raise ValueError("Unknown normalization type %s" % normtype)
+                errmsg = "Unknown normalization type {:s}"
+                raise ValueError(errmsg.format(normtype))
 
             # Note this will be negative due to the frequency ordering,
             # but that's okay because our normal integrals will be negative
@@ -306,7 +310,8 @@ class response(object):
             elif xun == 'meters':
                 self._normwave = 1e6 * val
             else:
-                raise ValueError("Unrecognized wavelength type %s" % xtype)
+                errmsg = "Unrecognized wavelength type {:s}"
+                raise ValueError(errmsg.format(xtype))
             self._normfreq = 299792458e-3 / self._normwave
         elif xtyp == 'freq':
             # Change to GHz
@@ -479,7 +484,8 @@ class response(object):
 
 
     def __str__(self):
-        return "name: %s lambda_eff: %0gum" % (self._name, self._effective_wave)
+        val = "name: {0:s} lambda_eff: {1:0g}um"
+        return val.format(self._name, self._effective_wave)
 
 class response_set(object):
     """ A set of instrument responses.  Doesn't read in actual responses
@@ -531,7 +537,7 @@ class response_set(object):
             data = astropy.io.ascii.read(os.path.join(dir,inputfile), 
                                          comment='^#')
         if len(data) == 0 :
-            raise IOError("No data read from %s" % inputfile)
+            raise IOError("No data read from {:s}".format(inputfile))
 
         # Clear old responses
         self._responses.clear()

@@ -402,8 +402,8 @@ class mbb_fitter(object):
         if fixed_and_outside.any():
             badparams = \
                 ', '.join(self._parnames[fixed_and_outside.nonzero()[0]])
-            errmsg = "Some fixed parameters outside limits: %s"
-            raise ValueError(errmsg % badparams)
+            errmsg = "Some fixed parameters outside limits: {:s}"
+            raise ValueError(errmsg.format(badparams))
                                   
         # Adjust initial values if necessary.  We try to keep them
         # close to the user provided value, just shifting into the
@@ -416,7 +416,8 @@ class mbb_fitter(object):
                 if self.has_uplim(i):
                     par_range = self.uplim(i) - self.lowlim(i)
                     if par_range <= 0:
-                        raise ValueError("Limits on parameter %d cross" % i)
+                        errmsg = "Limits on parameter {:d} cross"
+                        raise ValueError(errmsg.format(i))
                     if 2.0 * initsigma[i] >= par_range:
                         int_init[i] = self.lowlim(i) + 0.5 * par_range
                     else:
@@ -466,8 +467,8 @@ class mbb_fitter(object):
                     nbad = len(badidx)
 
                     if iters > maxiters:
-                        errmsg = "Too many iterations initializing param %d"
-                        raise Exception(errmsg % i)
+                        errmsg = "Too many iterations initializing param {:d}"
+                        raise Exception(errmsg.format(i))
 
                 p0[:,i] = pvec
 
@@ -509,30 +510,30 @@ class mbb_fitter(object):
             if i == 3 and self._noalpha: continue
             # Limit check
             if self.has_uplim(i) and p0[:,i].max() > self.uplim(i):
-                errmsg = "Upper limit initial value violation for %s"
-                raise ValueError(errmsg % self._parnames[i])
+                errmsg = "Upper limit initial value violation for {:s}"
+                raise ValueError(errmsg.format(self._parnames[i]))
             if p0[:,i].min() < self.lowlim(i):
-                errmsg = "Lower limit initial value violation for %s"
-                raise ValueError(errmsg % self._parnames[i])
+                errmsg = "Lower limit initial value violation for {:s}"
+                raise ValueError(errmsg.format(self._parnames[i]))
                 
         # Do burn in
         self.sampler.reset()
         self._sampled = False
 
         if nburn <= 0:
-            errmsg = "Invalid (non-positive) number of burn in steps: %d"
-            raise ValueError(errmsg % nburn)
+            errmsg = "Invalid (non-positive) number of burn in steps: {:d}"
+            raise ValueError(errmsg.format(nburn))
         if verbose:
-            print("  Doing burn in with %d steps" % nburn)
+            print("  Doing burn in with {:d} steps".format(nburn))
         pos, prob, rstate = self.sampler.run_mcmc(p0, nburn)
 
         # Reset and do main fit
         self.sampler.reset()
         if nsteps <= 0:
-            errmsg = "Invalid (non-positive) number of main chain steps: %d"
-            raise ValueError(errmsg % nsteps)
+            errmsg = "Invalid (non-positive) number of main chain steps: {:d}"
+            raise ValueError(errmsg.format(nsteps))
         if verbose:
-            print("  Doing main chain with %d steps" % nsteps)
+            print("  Doing main chain with {:d} steps".format(nsteps))
         st = self.sampler.run_mcmc(pos, nsteps, rstate0=rstate)
         self._sampled = True
 
@@ -543,14 +544,15 @@ class mbb_fitter(object):
             try :
                 acor = self.sampler.acor
                 print("   Autocorrelation time: ")
-                print("    Number of burn in steps (%d) should be larger "
-                      "than these" % nburn)
-                print("\tT:        %f" % acor[0])
-                print("\tbeta:     %f" % acor[1])
+                msg = "    Number of burn in steps ({:d}) should be larger "+\
+                      "than these"
+                print(msg.format(nburn))
+                print("\tT:        {:f}".format(acor[0]))
+                print("\tbeta:     {:f}".format(acor[1]))
                 if not self._opthin:
-                    print("\tlambda0:  %f" % acor[2])
+                    print("\tlambda0:  {:f}".format(acor[2]))
                 if not self._noalpha:
-                    print("\talpha:    %f" % acor[3])
-                print("\tfnorm:    %f" % acor[4])
+                    print("\talpha:    {:f}".format(acor[3]))
+                print("\tfnorm:    {:f}".format(acor[4]))
             except ImportError :
                 pass
