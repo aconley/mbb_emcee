@@ -10,6 +10,7 @@ mbb_emcee/.#*
 mbb_blackbody_emcee/*~
 
 # Packages
+MANIFEST
 *.egg
 *.egg-info
 dist
