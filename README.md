@@ -32,7 +32,7 @@ the file test.h5:
 	print("Beta: {:0.2f}+{:0.2f}-{:0.2f}".format(*b_val))
 	res.compute_peaklambda()
 	p_val = res.peaklambda_cen()
-	print("Peak Obs wavelength: {:0.1f}+{:0.1f}-{0.1f} [um]".format(*p_val))
+	print("Peak Obs wavelength: {:0.1f}+{:0.1f}-{:0.1f} [um]".format(*p_val))
 
 Note that all the blackbody parameters (temperature, etc.) are 
 in the observer frame.  This package is primarily developed in python 3,

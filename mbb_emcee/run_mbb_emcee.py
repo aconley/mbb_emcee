@@ -73,8 +73,12 @@ if __name__ == "__main__":
     parser.add_argument('-c','--covfile',action='store',
                         help="FITS file containing covariances (in mJy)",
                         default=None)
-    parser.add_argument('-e','--covextn',action='store',default=0,type=int,
-                        help="Extension of FITS file to look for cov matrix in (Def: 0)")
+    parser.add_argument('-C','--cosmotype',action='store',
+                        help="Name of astropy.cosmology to use (e.g., "
+                        "WMAP9 or Planck13; def: WMAP9)", default='WMAP9')
+    parser.add_argument('-e','--covextn',action='store', default=0, type=int,
+                        help="Extension of FITS file to look for cov "
+                        "matrix in (Def: 0)")
     parser.add_argument('--fixT',action='store_true', default=None,
                         help="Fix T to initial value")
     parser.add_argument('--fixBeta',action='store_true', default=None,
@@ -100,14 +104,17 @@ if __name__ == "__main__":
                         default=(2.64, 125),
                         help="Dust opacity in m^2 kg^-1 and wavelength in um")
     parser.add_argument('--get_dustmass',action='store_true',default=False,
-                        help="Estimate dust mass in 10^8 M_sun.  You must set the redshift")
+                        help="Estimate dust mass in 10^8 M_sun.  You must "
+                        "set the redshift")
     parser.add_argument('--get_lir',action='store_true',default=False,
-                        help="Get the rest frame 8-1000um luminosity.  You must set the redshift")
+                        help="Get the rest frame 8-1000um luminosity.  You "
+                        "must set the redshift")
     parser.add_argument('--get_peaklambda', action='store_true', default=False,
                         help="Get the observer frame SED peak wavelength")
     parser.add_argument('--lir_range', action='store', type=float, nargs=2,
                         default=(8,1000.0), 
-                        help="Rest frame wavelength range of L_IR computation, in um")
+                        help="Rest frame wavelength range of L_IR "
+                        "computation, in um")
     parser.add_argument("--lowT",action='store',type=float,default=None,
                         help="Lower limit on T (Def:0)")
     parser.add_argument("--lowBeta",action='store',type=float,default=None,
@@ -119,12 +126,14 @@ if __name__ == "__main__":
     parser.add_argument("--lowFnorm",action='store',type=float,default=None,
                         help="Lower limit on fnorm (Def:0)")
     parser.add_argument("--lumdist",action='store',type=float,default=None,
-                        help="Luminosity distance in Mpc (Def: computed from z)")
+                        help="Luminosity distance in Mpc (Def: computed "
+                        "from z)")
     parser.add_argument('-p','--photdir',action='store',
                         help="Directory to look for files in",
                         default=None)
     parser.add_argument('--maxidx',action='store',type=int,default=None,
-                        help="Maximum number of steps (per walker) to include in L_IR, dustmass.")
+                        help="Maximum number of steps (per walker) to "
+                        "include in L_IR, dustmass.")
     parser.add_argument('-n','--nwalkers',action='store',type=int,
                         help="Number of walkers to use in MCMC (Def: 250)",
                         default=250)
@@ -182,13 +191,13 @@ if __name__ == "__main__":
     # Set up fit
     npar = 5
     if not parse_results.photdir is None :
-        photfile = os.path.join(parse_results.photdir,parse_results.photfile)
+        photfile = os.path.join(parse_results.photdir, parse_results.photfile)
     else :
         photfile = parse_results.photfile
     
     if not parse_results.covfile is None :
         if not parse_results.photdir is None :
-            covfile = os.path.join(parse_results.photdir,parse_results.covfile)
+            covfile = os.path.join(parse_results.photdir, parse_results.covfile)
         else : covfile = parse_results.covfile
     else: covfile = None
     
@@ -198,7 +207,7 @@ if __name__ == "__main__":
         raise ValueError("Invalid (non-positive) nwalkers: %d" % nwalkers)
 
     fit = mbb_emcee.mbb_fitter(nwalkers=nwalkers, photfile=photfile, 
-                               covfile=covfile,  covextn=parse_results.covextn,
+                               covfile=covfile, covextn=parse_results.covextn,
                                wavenorm=parse_results.wavenorm, 
                                noalpha=parse_results.noalpha,
                                opthin=parse_results.opthin, 
@@ -275,7 +284,9 @@ if __name__ == "__main__":
             verbose=parse_results.verbose)
 
     # Jam results into output structure
-    res = mbb_emcee.mbb_results(fit, parse_results.redshift)
+    res = mbb_emcee.mbb_results(fit=fit, redshift=parse_results.redshift,
+                                lumdist=parse_results.lumdist,
+                                cosmo_type=parse_results.cosmotype)
     del fit
 
     # Peak wavelength computation
@@ -293,8 +304,7 @@ if __name__ == "__main__":
         if parse_results.verbose: 
             print("Computing L_IR (%0.1f-%0.1fum)" % (minwave, maxwave))
         res.compute_lir(wavemin=minwave, wavemax=maxwave, 
-                        maxidx=parse_results.maxidx,
-                        lumdist=parse_results.lumdist)
+                        maxidx=parse_results.maxidx)
 
     # M_dust computation
     if parse_results.get_dustmass: 
@@ -305,14 +315,12 @@ if __name__ == "__main__":
         if parse_results.verbose: 
             print("Computing dust mass")
         res.compute_dustmass(kappa=kappa, kappa_wave=kappa_wave, 
-                             maxidx=parse_results.maxidx,
-                             lumdist=parse_results.lumdist)
+                             maxidx=parse_results.maxidx)
 
     #Summarize results
     if parse_results.verbose:
         print("Fit results:")
         print(res)
-
 
     #Save output
     if parse_results.verbose : 

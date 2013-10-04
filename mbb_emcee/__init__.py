@@ -5,6 +5,6 @@ from .response import *
 from .mbb_fit import *
 from .results import *
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 
 __doc__ = """ Modified blackbody MCMC fits"""

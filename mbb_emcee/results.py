@@ -4,6 +4,8 @@ import numpy as np
 import emcee
 import math
 import multiprocessing
+import astropy.units as u
+import astropy.cosmology
 from .modified_blackbody import modified_blackbody
 from .response import response_set
 from .mbb_fit import mbb_fitter
@@ -32,7 +34,8 @@ class mbb_results(object):
                     'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
                     'alpha': 3, 'fnorm': 4, 'f500': 4}
 
-    def __init__(self, fit=None, redshift=None):
+    def __init__(self, fit=None, redshift=None, lumdist=None, 
+                 cosmo_type='WMAP9'):
         """
         Parameters
         ----------
@@ -42,6 +45,14 @@ class mbb_results(object):
         redshift : float
           Redshift of source.  Necessary if you plan to compute
           dustmass, L_IR, or L_AGN
+
+        lumdist : float or astropy.units.Quantity
+          Luminosity distance to object, in Mpc if units not specified.
+
+        cosmo_type : string
+          Name of cosmology to use if needed.  The pre-loaded
+          cosmologies from astropy.cosmology are supported (e.g.,
+          'WMAP9', 'Planck13').  This is used if lumdist is not provided
         """
 
         if redshift is None:
@@ -57,10 +68,21 @@ class mbb_results(object):
         self._kappa = None
         self._kappa_wave = None
         self._has_peaklambda = False
-            
+        if lumdist is None:
+            self._has_lumdist = False
+        else:
+            self._has_lumdist = True
+            if isinstance (lumdist, u.Quantity):
+                self._lumdist = lumdist.to(u.Mpc)
+            else:
+                self._lumdist = u.Quantity(float(lumdist), u.Mpc)
+        if cosmo_type is None:
+            raise ValueError("Cosmology type must not be none -- "
+                             "maybe you should just use the default")
+        self._cosmo_type = cosmo_type
         if not fit is None:
             self.process_fit(fit)
-            
+
     def process_fit(self, fit):
         """ Process the fit"""
 
@@ -162,6 +184,34 @@ class mbb_results(object):
         return self._response_integrate
 
     @property
+    def cosmo_type(self):
+        return self._cosmo_type
+
+    @property
+    def cosmology(self):
+        """ Return the current cosmology"""
+        if not self._cosmo_type in astropy.cosmology.parameters.available:
+            raise ValueError("Unknown cosmology type: {:s}".format(self._cosmo_type))
+        return getattr(astropy.cosmology, self._cosmo_type)
+
+    @property
+    def lumdist(self):
+        """ Returns luminosity distance to object"""
+        if self._has_lumdist:
+            return self._lumdist
+        else:
+            if self._z is None:
+                raise Exception("Need redshift to be set to compute lumdist")
+            if self._z <= -1: # Not okay
+                errmsg = "Redshift is less than -1: {:f}"
+                raise ValueError(errmsg.format(self._z))
+            dl = self.cosmology.luminosity_distance(self._z)
+            if isinstance(dl, u.Quantity):
+                return dl
+            else:
+                return u.Quantity(dl, u.Mpc)
+
+    @property
     def best_fit(self):
         """ Gets the best fitting point that occurred during the fit
 
@@ -187,7 +237,6 @@ class mbb_results(object):
         
         if not self._fitset: return None
         return -2.0 * self._best_fit[1]
-
 
     def best_fit_sed(self, wave):
         """ Get the best fitting SED
@@ -522,8 +571,7 @@ class mbb_results(object):
         return self._parcen_internal(self.lir.flatten(), percentile,
                                      lowlim=lowlim, uplim=uplim)
 
-    def compute_lir(self, wavemin=8.0, wavemax=1000.0,
-                    maxidx=None, lumdist=None):
+    def compute_lir(self, wavemin=8.0, wavemax=1000.0, maxidx=None):
         """ Computes LIR from chain in 10^12 L_sun.
 
         Parameters
@@ -537,14 +585,10 @@ class mbb_results(object):
         maxidx : int
           Maximum index in each walker to use. 
 
-        lumdist : float
-          Luminosity distance in Mpc.  Otherwise computed from redshift
-          assuming WMAP 9 cosmological model.
-
         Notes
         -----
-        The traditional definition of L_IR is 8-1000um.  Sometimes
-        42.5-112.5um is used.
+        The traditional definition of L_IR is 8-1000um.  Some authors use
+        42.5-112.5um instead.
         """
 
         if not self._fitset: 
@@ -566,22 +610,7 @@ class mbb_results(object):
         # 4*pi*dl^2/L_sun in cgs -- so the output will be in 
         # solar luminosities; the prefactor is
         # 4 * pi * mpc_to_cm^2/L_sun
-        if not lumdist is None:
-            if self._z <= -1:
-                errmsg = "Redshift is less than -1: {:f}"
-                raise ValueError(errmsg.format(self._z))
-            dl = float(lumdist)
-            if dl <= 0.0:
-                raise ValueError("Invalid luminosity distance: {:f}".format(dl))
-        else:
-            if self._z <= 0:
-                raise ValueError("Redshift is invalid: {:f}".format(self._z))
-            import astropy.cosmology
-            import astropy.units as u
-            dl = astropy.cosmology.WMAP9.luminosity_distance(self._z) #Mpc
-            if isinstance(dl, u.Quantity):
-                dl = dl.value
-
+        dl = self.lumdist.value # in Mpc
         lirprefac = 3.11749657e4 * dl**2 # Also converts to 10^12 lsolar
 
         # L_IR defined as between 8 and 1000 microns (rest)
@@ -683,8 +712,7 @@ class mbb_results(object):
             dustmass *= op_fac
         return dustmass
 
-    def compute_dustmass(self, kappa=2.64, kappa_wave=125.0,
-                         maxidx=None, lumdist=None):
+    def compute_dustmass(self, kappa=2.64, kappa_wave=125.0, maxidx=None):
         """Compute dust mass in 10^8 M_sun from chain
 
         Parameters
@@ -699,10 +727,6 @@ class mbb_results(object):
         
         maxidx : int
           Maximum index in each walker to use.  Ignored if threading.
-
-        lumdist : float
-          Luminosity distance in Mpc.  Otherwise computed from redshift
-          assuming WMAP 9 cosmological model.
         """
 
         if not self._fitset:
@@ -720,24 +744,8 @@ class mbb_results(object):
             errmsg = "Invalid (non-positive) kappa wavelength {:f}"
             raise ValueError(errmsg.format(self._kappa_wave))
         
-        # Get luminosity distance
-        if not lumdist is None:
-            if self._z <= -1:
-                errmsg = "Redshift is less than -1: {:f}"
-                raise ValueError(errmsg.format(self._z))
-            dl = float(lumdist)
-            if dl <= 0.0:
-                errmsg = "Invalid luminosity distance: {:f}"
-                raise ValueError(errmsg.format(dl))
-        else:
-            if self._z <= 0:
-                raise ValueError("Redshift is invalid: {:f}".format(self._z))
-            import astropy.cosmology
-            import astropy.units as u
-            dl = astropy.cosmology.WMAP9.luminosity_distance(self._z) #Mpc
-            if isinstance(dl, u.Quantity):
-                dl = dl.value
 
+        dl = self.lumdist.value
         mpc_to_cm = 3.08567758e24
         dl *= mpc_to_cm
         dl2 = dl**2
@@ -1045,6 +1053,9 @@ class mbb_results(object):
 
         # Ancillary variables (L_IR, etc.)
         ga = f.create_group("Ancillary")
+        ga.attrs["cosmo_type"] = self._cosmo_type
+        if self._has_lumdist:
+            ga.attrs["lumdist"] = self._lumdist.value # in Mpc
         if self._has_lir:
             ga.attrs["LirMin"] = self._lir_min
             ga.attrs["LirMax"] = self._lir_max
@@ -1110,6 +1121,14 @@ class mbb_results(object):
                           gc["BestFitIndex"][()])
         
         ga = f["Ancillary"]
+
+        if "cosmo_type" in ga:
+            self._cosmo_type = ga.attrs["cosmo_type"]
+        if "lumdist" in ga:
+            self._has_lumdist = True
+            self._lumdist = u.Quantity(ga.attrs["lumdist"], u.Mpc)
+        else:
+            self._has_lumdist = False
         if "Lir" in ga:
             self._lir_min = ga.attrs["LirMin"]
             self._lir_max = ga.attrs["LirMax"]
@@ -1214,7 +1233,7 @@ class mbb_results(object):
         
         # Lambda peak prior
         if self._has_uplim[5] or self._has_gprior[5]:
-            retstr += "Lambda_peak"
+            retstr += "Lambda_peak prior"
             if self._has_uplim[5]:
                 retstr += " upper lim: {:0.2f}".format(self._uplim[5])
             if self._has_gprior[5]:
@@ -1222,7 +1241,21 @@ class mbb_results(object):
                 retstr += msg.format(self._gprior_mean[5], 
                                      self._gprior_sigma[5])
             retstr += "\n"
-            
+
+        if self.has_peaklambda:
+            pstr = "Lambda peak: {:0.1f} +{:0.1f} -{:0.1f} [um]\n"
+            retstr += pstr.format(*self.peaklambda_cen())
+
+        if self.has_lir:
+            args = self.lir_wavelength + tuple(self.lir_cen())
+            lirstr = "L_IR({:0.1f} to {:0.1f}um): {:0.2f} +{:0.2f} -{:0.2f} [10^12 L_sun]\n"
+            retstr += lirstr.format(*args)
+
+        if self.has_dustmass:
+            args = (self.dust_kappa, self._dust_kappa_wavelength) + tuple(self.dustmass_cen())
+            duststr = "M_d(kappa={:0.2f}, lam={0:1f}): {:0.2f} +{:0.2f} -{:0.2f} [10^8 M_sun]\n"
+            retstr += duststr.format(args)
+
         retstr += "Number of data points: {:d}\n".format(self._ndata)
         retstr += "ChiSquare of best fit point: {:0.2f}".format(self.best_fit_chisq)
 
