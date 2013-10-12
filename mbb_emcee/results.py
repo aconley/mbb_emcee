@@ -1252,9 +1252,11 @@ class mbb_results(object):
             retstr += lirstr.format(*args)
 
         if self.has_dustmass:
-            args = (self.dust_kappa, self._dust_kappa_wavelength) + tuple(self.dustmass_cen())
-            duststr = "M_d(kappa={:0.2f}, lam={0:1f}): {:0.2f} +{:0.2f} -{:0.2f} [10^8 M_sun]\n"
-            retstr += duststr.format(args)
+            args = (self.dust_kappa, self.dust_kappa_wavelength) +\
+                   tuple(self.dustmass_cen())
+            duststr = "M_d(kappa={0:0.2f}, lam={1:0.1f}um): {2:0.2f} "\
+                      "+{3:0.2f} -{4:0.2f} [10^8 M_sun]\n"
+            retstr += duststr.format(*args)
 
         retstr += "Number of data points: {:d}\n".format(self._ndata)
         retstr += "ChiSquare of best fit point: {:0.2f}".format(self.best_fit_chisq)
