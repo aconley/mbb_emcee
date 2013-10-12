@@ -110,8 +110,8 @@ class mbb_results(object):
         self._response_integrate = fit.like.response_integrate
         if self._response_integrate:
             self._responsewheel = fit.like._responsewheel
-        elif hasattr(self, '_response_integrate'):
-            del self._response_integrate
+        elif hasattr(self, '_responsewheel'):
+            del self._responsewheel
 
         # Data
         self._data_wave = fit.like.data_wave
