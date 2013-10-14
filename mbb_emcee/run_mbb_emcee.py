@@ -225,29 +225,29 @@ if __name__ == "__main__":
         
     # Lower limits
     if not parse_results.lowT is None: 
-        fit.set_lowlim('T',parse_results.lowT)
+        fit.set_lowlim('T', parse_results.lowT)
     if not parse_results.lowBeta is None: 
-        fit.set_lowlim('beta',parse_results.lowBeta)
+        fit.set_lowlim('beta', parse_results.lowBeta)
     if (not parse_results.opthin) and (not parse_results.lowLambda0 is None): 
-        fit.set_lowlim('lambda0',parse_results.lowLambda0)
+        fit.set_lowlim('lambda0', parse_results.lowLambda0)
     if (not parse_results.noalpha) and (not parse_results.lowAlpha is None): 
-        fit.set_lowlim('alpha',parse_results.lowAlpha)
+        fit.set_lowlim('alpha', parse_results.lowAlpha)
     if not parse_results.lowFnorm is None: 
-        fit.set_lowlim('fnorm',parse_results.lowFnorm)
+        fit.set_lowlim('fnorm', parse_results.lowFnorm)
 
     # Upper Limits
     if not parse_results.upT is None: 
-        fit.set_uplim('T',parse_results.upT)
+        fit.set_uplim('T', parse_results.upT)
     if not parse_results.upBeta is None : 
-        fit.set_uplim('beta',parse_results.upBeta)
+        fit.set_uplim('beta', parse_results.upBeta)
     if (not parse_results.opthin) and (not parse_results.upLambda0 is None): 
-        fit.set_uplim('lambda0',parse_results.upLambda0)
+        fit.set_uplim('lambda0', parse_results.upLambda0)
     if (not parse_results.noalpha) and (not parse_results.upAlpha is None): 
-        fit.set_uplim('alpha',parse_results.upAlpha)
+        fit.set_uplim('alpha', parse_results.upAlpha)
     if not parse_results.upFnorm is None : 
-        fit.set_uplim('fnorm',parse_results.upFnorm)
+        fit.set_uplim('fnorm', parse_results.upFnorm)
     if not parse_results.upLambdaPeak is None : 
-        fit.set_uplim('lambda_peak',parse_results.upLambdaPeak)
+        fit.set_uplim('lambda_peak', parse_results.upLambdaPeak)
 
     # Priors
     if not parse_results.priorT is None:

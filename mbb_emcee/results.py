@@ -34,13 +34,17 @@ class mbb_results(object):
                     'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
                     'alpha': 3, 'fnorm': 4, 'f500': 4}
 
-    def __init__(self, fit=None, redshift=None, lumdist=None, 
+    def __init__(self, fit=None, h5file=None, redshift=None, lumdist=None, 
                  cosmo_type='WMAP9'):
         """
         Parameters
         ----------
         fit : mbb_fitter
           Fit object
+
+        h5file : string
+          Name of HDF5 file to load from previously saved fit.  You can't 
+          provide this in combination with any of the other variables.
           
         redshift : float
           Redshift of source.  Necessary if you plan to compute
@@ -55,10 +59,17 @@ class mbb_results(object):
           'WMAP9', 'Planck13').  This is used if lumdist is not provided
         """
 
-        if redshift is None:
-            self._z = None
-        else:
-            self._z = float(redshift)
+        # Make sure user isn't trying to specify too much
+        if not h5file is None:
+            if not fit is None:
+                raise Exception("It doesn't make sense to provide h5file"\
+                                " and a fit to process")
+            if not redshift is None:
+                raise Exception("It doesn't make sense to provide h5file"\
+                                " and the redshift")
+            if not lumdist is None:
+                raise Exception("It doesn't make sense to provide h5file"\
+                                " and the lumdist")
 
         self._fitset = False
         self._has_lir = False
@@ -68,20 +79,30 @@ class mbb_results(object):
         self._kappa = None
         self._kappa_wave = None
         self._has_peaklambda = False
-        if lumdist is None:
-            self._has_lumdist = False
+
+        if not h5file is None:
+            self.readFromHDF5(h5file)
         else:
-            self._has_lumdist = True
-            if isinstance (lumdist, u.Quantity):
-                self._lumdist = lumdist.to(u.Mpc)
+            if redshift is None:
+                self._z = None
             else:
-                self._lumdist = u.Quantity(float(lumdist), u.Mpc)
-        if cosmo_type is None:
-            raise ValueError("Cosmology type must not be none -- "
-                             "maybe you should just use the default")
-        self._cosmo_type = cosmo_type
-        if not fit is None:
-            self.process_fit(fit)
+                self._z = float(redshift)
+
+            if lumdist is None:
+                self._has_lumdist = False
+            else:
+                self._has_lumdist = True
+                if isinstance (lumdist, u.Quantity):
+                    self._lumdist = lumdist.to(u.Mpc)
+                else:
+                    self._lumdist = u.Quantity(float(lumdist), u.Mpc)
+            if cosmo_type is None:
+                raise ValueError("Cosmology type must not be none -- "
+                                 "maybe you should just use the default")
+            self._cosmo_type = cosmo_type
+
+            if not fit is None:
+                self.process_fit(fit)
 
     def process_fit(self, fit):
         """ Process the fit"""
@@ -745,9 +766,7 @@ class mbb_results(object):
             raise ValueError(errmsg.format(self._kappa_wave))
         
 
-        dl = self.lumdist.value
-        mpc_to_cm = 3.08567758e24
-        dl *= mpc_to_cm
+        dl = self.lumdist.to(u.cm).value
         dl2 = dl**2
         opz = 1.0 + self._z
 

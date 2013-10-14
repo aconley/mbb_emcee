@@ -204,12 +204,12 @@ class likelihood(object) :
             raise ValueError("wave not same length as flux_unc")
         self._ivar = 1.0 / self._flux_unc**2
 
-        # Set upper limit on lambda0 -- if its 5x above
+        # Set upper limit on lambda0 -- if its 3x above
         #  our longest wavelength point, we can't say anything
         #  about it.
         if not self._has_uplim[2]:
             self._has_uplim[2] = True
-            self._uplim[2] = 5.0 * self._wave.max()
+            self._uplim[2] = 3.0 * self._wave.max()
 
         self._data_read = True
         self._has_covmatrix = False
