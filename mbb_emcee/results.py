@@ -1126,9 +1126,11 @@ class mbb_results(object):
         self._data_flux = gd["FluxDensity"][...]
         self._data_flux_unc = gd["FluxDensityUnc"][...]
         if "Covmatrix" in gd:
+            self._has_covmatrix = True
             self._covmatrix = gd["Covmatrix"][...]
             self._invcovmatrix = gd["InvCovmatrix"][...]
         else:
+            self._has_covmatrix = False
             if hasattr(self,"_covmatrix"): del self._covmatrix
             if hasattr(self,"_invcovmatrix"): del self._invcovmatrix
 
