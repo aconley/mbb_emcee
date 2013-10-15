@@ -23,7 +23,7 @@ class likelihood(object) :
 
     def __init__(self, photfile=None, covfile=None, covextn=0, 
                  wavenorm=500.0, noalpha=False, opthin=False,
-                 responsefile=None, responsedir=None) :
+                 response=False, responsefile=None, responsedir=None) :
         """ Object for computing likelihood of a given set of parameters.
 
         Parameters
@@ -46,12 +46,16 @@ class likelihood(object) :
         opthin : bool
            Assume optically thin
 
+        response : bool
+           Use response integration
+
         responsefile : string
-           Name of file containing response specifications.  If set,
-           response integration is used in the fitting.
+           Name of file containing response specifications if not using 
+           standard set.  Ignored unless response is set.
 
         responsedir : string
-           Directory to look for response files in.
+           Directory to look for response files in.  Ignored unless
+           response is set
         """
 
         self._wavenorm = float(wavenorm)
@@ -89,7 +93,7 @@ class likelihood(object) :
 
         # Responses
         self._response_integrate = False
-        if not responsefile is None:
+        if response:
             self.read_responses(responsefile, responsedir=responsedir)
 
         # Data
@@ -133,13 +137,14 @@ class likelihood(object) :
         """Is filter integration being used?"""
         return self._response_integrate
         
-    def read_responses(self, responsefile, responsedir=None):
+    def read_responses(self, responsefile=None, responsedir=None):
         """ Read in responses
 
         Parameters
         ----------
         responsefile : string
-          File containing filter specification information.
+          File containing filter specification information.  If None,
+          reads default information.
 
         responsedir : string
           Directory to look for actual responses in.
@@ -150,7 +155,6 @@ class likelihood(object) :
         """
         self._responsewheel = response_set(responsefile, dir=responsedir)
         self._response_integrate = True
-
 
     def set_phot(self, firstarg, flux, flux_unc):
         """ Sets photometry
@@ -180,10 +184,21 @@ class likelihood(object) :
                 raise ValueError("Expecting response string name")
             self._responses = []
             for name in firstarg:
-                # Do it this way to provide a more helpful error message
-                # if name is not known
+                # Make sure we have, or can construct, the right passband
                 if not name in self._responsewheel:
-                    raise ValueError("Unknown filter response %s" % name)
+                    # Figure out if it's a 'special' one (delta, boxcar, alma)
+                    # these are -assumed- to be frequency, since the usual
+                    # use is to add interferometer tunable passbands
+                    if name.find('_'):
+                        # May be -- split off first part
+                        bs = name.split('_')[0].lower()
+                        if bs in ["delta", "box", "alma"]:
+                            # Add it!
+                            self._responsewheel.add_special(name)
+                        else:
+                            raise ValueError("Unknown filter response {:s}".format(name))
+                    else:
+                        raise ValueError("Unknown filter response {:s}".format(name))               
                 self._responses.append(self._responsewheel[name])
 
             self._response_names = [r.name for r in self._responses]

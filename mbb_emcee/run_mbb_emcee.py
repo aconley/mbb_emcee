@@ -55,11 +55,10 @@ if __name__ == "__main__":
      'lambda_peak'.
 
      By default the instrument responses are modeled as delta functions
-     at the wavelengths in photfile.  However, if --responsefile is given,
-     then the names of the response functions in the photfile, coupled with
-     the actual responses as specified in the response file, are used to
-     fully include the instrumental responses.  This will slow down the code
-     significantly.
+     at the wavelengths in photfile.  However, if --response is set,
+     then response modelling is used.  In this case, the first element of
+     each non-comment line should be the name of the passband as discussed
+     in the README file. Note that this will slow down the code significantly.
      ''')
 
     parser = argparse.ArgumentParser(description=desc, epilog=epi,
@@ -156,7 +155,9 @@ if __name__ == "__main__":
                         default=None,help="Mean and sigma of fnorm prior")
     parser.add_argument('--priorLambdaPeak',action="store",nargs=2,type=float,
                         default=None,help="Mean and sigma of peak lambda prior")
-    parser.add_argument('-r', '--responsefile', action="store", default=None,
+    parser.add_argument('-r', '--response', action="store_true", default=False,
+                        help="Turn on response integration")
+    parser.add_argument('--responsefile', action="store", default=None,
                         help="Response specification file")
     parser.add_argument('--responsedir', action="store", default=None,
                         help="Response specification directory")
@@ -212,6 +213,7 @@ if __name__ == "__main__":
                                noalpha=parse_results.noalpha,
                                opthin=parse_results.opthin, 
                                nthreads=parse_results.threads,
+                               response=parse_results.response,
                                responsefile=parse_results.responsefile,
                                responsedir=parse_results.responsedir)
     

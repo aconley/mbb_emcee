@@ -40,6 +40,48 @@ in the observer frame.
 This package is primarily developed in python 3, but should be
 compatable with python 2.7.
 
+###Input file specification
+There are two possible input file specifications.  The first treats
+all the instrument responses as delta functions, the second integrates
+them properly.  The latter is slower, and requires that you know the
+appropriate instrument information.
+
+When using the simple delta function approach, the input file specification
+are lines of the form: wavelength flux_density flux_density_uncertainty,
+where the wavelength is specified in microns, and the flux_density and
+it's uncertainty in mJy.  Note that the flux density uncertainties 
+in this file are ignored if the user provides a covariance matrix.
+
+In the second the format is similar, except that the wavlength is
+replaced with the name of the passband (e.g., SPIRE_250um).  The
+information specifying how the name is used is provided in a filter
+wheel file.  The user can specify their own such file (in a somewhat
+complicated format -- you will need to read the documentation of the
+response class), but a default version is also included that should cover
+most of the standard passbands.  
+
+However, this doesn't really work for interferometric observations,
+where the passbands can usually be tuned in all sorts of complicated
+ways.  One way to handle these is to build your own filter wheel file,
+but as an alternative a short specification can be provided as the
+filter name of the form box_cent_width, where cent and width are the
+central frequency and width of a boxcar representation of the filter
+in GHz.  So, for example, box_342_8 is a 8 GHz wide boxcar filter
+centered at 342 GHz.  Delta function passbands are also allowed using
+delta_cent, where, again, cent is the central frequency.  Finally, ALMA
+passbands are allowed using alma_cent where, again, cent is the central
+frequency in GHz.  Only bands 3, 6, and 7 are currently supported, and
+the assumption is that the standard IF ranges are used.  For bands 3 and 7
+this means 3.75 GHz coverage, a 8 GHz gap, then 3.75 GHz coverage, with
+the center of the 8 GHz gap at the central frequency.  For band 6,
+the central gap is 12 GHz.  More complex tunings can't be specified with
+the short specifications.
+
+The currently supported passbands in the default set are MIPS_24um,
+MIPS_70um, MIPS_160um, PACS_70um, PACS_100um, PACS_160um, SPIRE_250um,
+SPIRE_350um, SPIRE_500um, SABOCA_350um, LABOCA_870um, SCUBA2_450um,
+SCUBA2_850um, Bolocam_1.1mm, MAMBO2_1.1mm, and GISMO_2mm.
+
 ###Examining your results
 You should almost always look at both your actual fit and at
 histograms of the parameters to make sure there are not long tails of

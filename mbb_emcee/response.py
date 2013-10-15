@@ -1,5 +1,6 @@
 import math
 import numpy
+from pkg_resources import resource_filename
 import os.path
 import astropy.io.ascii
 import scipy.integrate
@@ -138,41 +139,33 @@ class response(object):
                 return
             elif bs == "box":
                 if len(spl) != 3:
-                    errmsg = "box car needs 2 params in {:s}"
-                    raise ValueError(errmsg.format(inputspec))
-                cent = float(spl[1])
-                width = float(spl[2])
-                npoints = 11
-                xvals = numpy.linspace(cent - 0.5 * width,
-                                       cent + 0.5 * width,
-                                       npoints)
-                self._resp = numpy.ones(npoints)
+                    errstr = "box car needs 2 params in {:s}".format(inputspec)
+                    raise ValueError(errstr)
+                xvals, self._resp = self._setup_box(float(spl[1]), 
+                                                    float(spl[2]))
             elif bs == "gauss":
                 if len(spl) != 3:
-                    errstr = "gaussian needs 2 params in {:s}"
-                    raise ValueError(errstr.format(inputspec))
-                cent = float(spl[1])
-                fwhm = float(spl[2])
-                minval = cent - 3.0*fwhm
-                maxval = cent + 3.0*fwhm
-                npoints = 43 # (FWHM/7)
-                sig = fwhm / math.sqrt(8 * math.log(2))
-                xvals = numpy.linspace(cent - 3.0*fwhm, 
-                                       cent + 3.0*fwhm,
-                                       npoints)
-                self._resp = numpy.exp(-0.5 * ((xvals - cent) / sig)**2)
+                    errstr = "gaussian needs 2 params in {:s}".format(inputspec)
+                    raise ValueError(errstr)
+                xvals, self._resp = self._setup_gauss(float(spl[1]), 
+                                                      float(spl[2]))
+
+            elif bs == "alma":
+                if len(spl) != 2:
+                    errstr = "alma needs 1 params in {:s}".format(inputspec)
+                    raise ValueError(errstr)
+                xvals, self._resp = self._setup_alma(float(spl[1]),
+                                                     xtyp, xun)
             else:
-                #A real file -- read it
+                #A real file -- read it!
                 if dir is None:
-                    data = astropy.io.ascii.read(inputspec, comment='^#')
-                    if len(data) == 0:
-                        errmsg = "No data read from {:s}"
-                        raise IOError(errmsg.format(inputspec))
+                    infile = inputspec
                 else:
                     infile = os.path.join(dir, inputspec)
-                    data = astropy.io.ascii.read(infile, comment='^#')
-                    if len(data) == 0:
-                        raise IOError("No data read from {:s}".format(infile))
+
+                data = astropy.io.ascii.read(infile, comment='^#')
+                if len(data) == 0:
+                    raise IOError("No data read from {:s}".format(infile))
 
                 xvals = numpy.asarray([dat[0] for dat in data])
                 self._resp = numpy.asarray([dat[1] for dat in data])
@@ -180,8 +173,8 @@ class response(object):
         # We don't allow negative responses or xvals
         if xvals.min() <= 0:
             raise ValueError("Non-positive x value encountered")
-        if self._resp.min() <= 0:
-            raise ValueError("Non-positive response encountered")
+        if self._resp.min() < 0:
+            raise ValueError("Negative response encountered")
         if xnorm <= 0:
             raise ValueError("Non-positive xnorm")
 
@@ -197,8 +190,8 @@ class response(object):
                 self._wave = 1e6 * xvals
                 self._normwave = 1e6 * xnorm
             else:
-                errmsg = "Unrecognized wavelength type {:s}"
-                raise ValueError(errmsg.format(xtype))
+                errmsg = "Unrecognized wavelength unit {:s}".format(xun)
+                raise ValueError(errmsg)
             self._freq = 299792458e-3 / self._wave #In GHz
             self._normfreq = 299792458e-3 / self._normwave
         elif xtyp == 'freq':
@@ -215,6 +208,10 @@ class response(object):
             elif xun == 'thz':
                 self._freq = 1e3 * xvals
                 self._normfreq = 1e3 * xnorm
+            else:
+                errmsg = "Unrecognized frequency unit {:s}".format(xun)
+                raise ValueError(errmsg)
+
             self._wave = 299792458e-3 / self._freq #Microns
             self._normwave = 299792458e-3 / self._normfreq
 
@@ -337,6 +334,74 @@ class response(object):
         self._normfac = 1.0
         self._sens_energy = True
         
+    def _setup_box(self, cent, width):
+        npoints = 11
+        xvals = numpy.linspace(cent - 0.5 * width,
+                               cent + 0.5 * width,
+                               npoints)
+        resp = numpy.ones(npoints)
+        return xvals, resp
+
+    def _setup_gauss(self, cent, fwhm):
+        minval = cent - 3.0*fwhm
+        maxval = cent + 3.0*fwhm
+        npoints = 43 # (FWHM/7)
+        sig = fwhm / math.sqrt(8 * math.log(2))
+        xvals = numpy.linspace(cent - 3.0*fwhm, 
+                               cent + 3.0*fwhm,
+                               npoints)
+        resp = numpy.exp(-0.5 * ((xvals - cent) / sig)**2)
+        return xvals, resp
+
+    def _setup_alma(self, cent, xtype='freq', xunit='gHz'):
+        # Get central frequency in GHz
+        npoints = 13
+        npoints0 = 3
+        if xtype == 'wave':
+            if xunit == 'angstroms':
+                cen_freq = 2997924580.0 / cent
+            elif xunit == 'microns':
+                cen_freq = 299792458e-3 / cent
+            elif xunit == 'meters':
+                cen_freq = 299792458.0e-9 / cent
+            else:
+                errmsg = "Unrecognized wavelength unit {:s}".format(xunit)
+                raise ValueError(errmsg)
+        elif xtype == 'freq':
+            if xunit == 'hz':
+                cen_freq = cent * 1e-9
+            elif xunit == 'mhz':
+                cen_freq = cent * 1e-3
+            elif xunit == 'ghz':
+                cen_freq = cent
+            elif xunit == 'thz':
+                cen_freq = cent * 1e3
+            else:
+                errmsg = "Unrecognized frequency unit {:s}".format(xunit)
+                raise ValueError(errmsg)
+        else:
+            raise ValueError("Unknown unit type {:s}".format(xtype))
+
+        # Identify band: bands 3, 6, 7; don't support band 9 since it's complex
+        if_low = numpy.array([92.0, 221.0, 283])
+        if_high = numpy.array([108.0, 265.0, 365.0])
+        if_range_bot = numpy.array([4, 4, 6.0])
+        wband = numpy.nonzero((cen_freq >= if_low) & (cen_freq <= if_high))[0]
+        if len(wband) == 0:
+            errmsg = "Unable to identify ALMA band with central freq {:0.1f}"
+            raise ValueError(errmsg.format(cen_freq))
+        xvals0 = numpy.linspace(cen_freq - if_range_bot[wband] - 3.75,
+                                cen_freq - if_range_bot[wband], npoints)
+        xvals1 = numpy.linspace(cen_freq - if_range_bot[wband] + 0.0001,
+                                cen_freq + if_range_bot[wband] - 0.0001, 
+                                npoints0)
+        xvals2 = numpy.linspace(cen_freq + if_range_bot[wband],
+                                cen_freq + if_range_bot[wband] + 3.75, npoints)
+        xvals = numpy.concatenate((xvals0, xvals1, xvals2))
+        resp = numpy.concatenate((numpy.ones(npoints), numpy.zeros(npoints0), 
+                                  numpy.ones(npoints)))
+        return xvals, resp
+
     @property
     def name(self):
         return self._name
@@ -484,12 +549,11 @@ class response(object):
 
 
     def __str__(self):
-        val = "name: {0:s} lambda_eff: {1:0g}um"
+        val = "{0:s} lambda_eff: {1:0.1f} [um]"
         return val.format(self._name, self._effective_wave)
 
 class response_set(object):
-    """ A set of instrument responses.  Doesn't read in actual responses
-    until told to."""
+    """ A set of instrument responses."""
     
     def __init__(self, inputfile=None, dir=None):
         """ Initialize response set.
@@ -500,42 +564,47 @@ class response_set(object):
           Name of input file
 
         dir: string
-          Directory to look for responses in
+          Directory to look for responses in; defaults to built-in location
         """
 
         self._responses = {}
-
-        if not inputfile is None:
-            self.read(inputfile, dir=dir)
+        # Note this loads a default if inputfile is None
+        self._read(inputfile=inputfile, dir=dir) 
     
 
-    def read(self, inputfile, dir=None):
+    def _read(self, inputfile=None, dir=None):
         """ Read in responses
 
         Parameters
         ----------
         inputfile : string
-          Name of input file
+          Name of input file.  If None, defaults to built-in location
+
         dir: string
-          Directory to look for responses in
+          Directory to look for responses in; defaults to current directory,
+          but is ignored if using default inputfile
  
         """
 
         import astropy.io.ascii
         
-        if not isinstance(inputfile, basestring):
+        if inputfile is None:
+            infile = resource_filename(__name__, 
+                                       'resources/mbb_filterwheel.txt')
+            indir = resource_filename(__name__, 'resources/')
+        elif not isinstance(inputfile, basestring):
             raise TypeError("filename must be string-like")
-        
-        if not dir is None:
-            if not isinstance(dir, basestring):
-                raise TypeError("dir must be string-like")
-
-        
-        if dir is None:
-            data = astropy.io.ascii.read(inputfile, comment='^#')
         else:
-            data = astropy.io.ascii.read(os.path.join(dir,inputfile), 
-                                         comment='^#')
+            if dir is None:
+                infile = inputfile
+                indir = None
+            else:
+                if not isinstance(dir, basestring):
+                    raise TypeError("dir must be string-like")
+                infile = os.path.join(dir, inputfile)
+                indir = dir
+        
+        data = astropy.io.ascii.read(infile, comment='^#')
         if len(data) == 0 :
             raise IOError("No data read from {:s}".format(inputfile))
 
@@ -548,8 +617,19 @@ class response_set(object):
             resp = response(name)
             resp.setup(dat[1], dat[2].lower(), dat[3].lower(), dat[4].lower(),
                        dat[5].lower(), float(dat[6]), float(dat[7]),
-                       dir=dir)
+                       dir=indir)
             self._responses[name] = resp
+
+    def add_special(self, name, xtype='freq', xunits='GHz',
+                    senstype='energy', normtype='flat', xnorm=250,
+                    normparam=0):
+        """ Add a 'special' filter (boxcar, delta, gaussian, etc.) as described
+        in response.setup"""
+
+        resp = response(name)
+        resp.setup(name, xtype=xtype, xunits=xunits, senstype=senstype,
+                   normtype=normtype, xnorm=xnorm, normparam=normparam)
+        self._responses[name] = resp
 
     def writeToHDF5(self, handle):
         """ Writes the response sets to an HDF5 handle (file, group).
@@ -608,5 +688,5 @@ class response_set(object):
     def delitem(self, val):
         del self._responses[val]
 
-
-    
+    def __str__(self):
+        return '\n'.join([str(self._responses[nm]) for nm in self._responses])

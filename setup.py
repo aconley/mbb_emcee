@@ -15,10 +15,11 @@ ext_modules = [Extension("fnu", ["mbb_emcee/fnu.pyx"],
 
 setup(
     name="mbb_emcee",
-    version="0.4.1",
+    version="0.4.2",
     author="Alexander Conley",
     author_email="alexander.conley@colorado.edu",
     packages=["mbb_emcee"],
+    package_data={'mbb_emcee':['resources/*.txt']},
     scripts=["mbb_emcee/run_mbb_emcee.py"],
     license="GPL",
     description="Modified blackbody fitting using MCMC",

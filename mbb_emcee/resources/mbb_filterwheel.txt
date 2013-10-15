@@ -1,0 +1,17 @@
+#Name	        File	           Xtype     Xunit     Sens	   NormType    XNorm    NormPar
+MIPS_24um       MIPS_24.txt        wave      microns   energy      bb          23.675   10000.0
+MIPS_70um       MIPS_70.txt        wave      microns   energy      bb          71.440   10000.0
+MIPS_160um      MIPS_160.txt       wave      microns   energy      bb          155.899  10000.0
+PACS_70um       PACS_70.txt        wave      microns   energy      power       70.0     -1.0
+PACS_100um      PACS_100.txt       wave      microns   energy      power       100.0    -1.0
+PACS_160um      PACS_160.txt       wave      microns   energy      power       160.0    -1.0
+SPIRE_250um     SPIRE_250.txt      wave      microns   energy      power       250.0    -1.0
+SPIRE_350um     SPIRE_350.txt      wave      microns   energy      power       350.0    -1.0
+SPIRE_500um     SPIRE_500.txt      wave      microns   energy      power       500.0    -1.0
+SABOCA_350um	SABOCA_350um.txt   wave      microns   energy      flat        350      0.0
+LABOCA_870um	LABOCA_870um.txt   wave      microns   energy      flat        870      0.0
+SCUBA2_450um    SCUBA2_450um.txt   wave      microns   energy      flat        450      0.0
+SCUBA2_850um    SCUBA2_850um.txt   wave      microns   energy      flat        850      0.0
+Bolocam_1.1mm   Bolocam_1100.txt   wave      microns   energy      flat        1100     0.0
+MAMBO2_1.2mm    MAMBO2.txt         wave      microns   energy      flat        1200     0.0
+GISMO_2mm	GISMO_2000.txt	   wave      microns   energy      flat        2000     0.0

@@ -24,9 +24,8 @@ class mbb_fitter(object):
 
 
     def __init__(self, nwalkers=250, photfile=None, covfile=None, 
-                 covextn=0, responsefile=None, responsedir=None,
-                 wavenorm=500.0, noalpha=False, 
-                 opthin=False, nthreads=1):
+                 covextn=0, response=False, responsefile=None, responsedir=None,
+                 wavenorm=500.0, noalpha=False, opthin=False, nthreads=1):
         """
         Parameters
         ----------
@@ -43,11 +42,15 @@ class mbb_fitter(object):
         covextn : integer
            Extension of covaraince file
 
+        response : bool
+           Use response integration
+
         responsefile : string
-           Name of response specification file
+           Name of response specification file.  Ignored if response is not set
 
         responsedir : string
-           Directory to look for response information in
+           Directory to look for response information in.  Ignored if
+           response is not set.
 
         wavenorm : float
            Wavelength of normalization in microns
@@ -70,6 +73,7 @@ class mbb_fitter(object):
         self.like = likelihood(photfile=photfile, covfile=covfile, 
                                covextn=covextn, wavenorm=wavenorm, 
                                noalpha=noalpha, opthin=opthin,
+                               response=response,
                                responsefile=responsefile,
                                responsedir=responsedir)
         self.sampler = emcee.EnsembleSampler(self._nwalkers, 5, self.like,
