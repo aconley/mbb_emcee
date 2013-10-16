@@ -47,7 +47,9 @@ if __name__ == "__main__":
      Note that alpha and beta always have upper limits of 20, since larger 
      values frequently cause overflows.  Lambda0 has an upper limit of
      10 times the longest wavelength data point.  The user can override
-     all these limits, but not turn them off.
+     all these limits, but not turn them off, and add limits on the other
+     parameters.  Note that the upper limits are soft limits, since hard
+     limits seem to cause convergence issues in some cases.
 
      In addition to setting upper and lower limits on the parameters, Gaussian
      priors can be applied to each parameter.  Furthermore, a prior can be
@@ -58,7 +60,7 @@ if __name__ == "__main__":
      at the wavelengths in photfile.  However, if --response is set,
      then response modelling is used.  In this case, the first element of
      each non-comment line should be the name of the passband as discussed
-     in the README file. Note that this will slow down the code significantly.
+     in the README file. Note that this will slow down the code.
      ''')
 
     parser = argparse.ArgumentParser(description=desc, epilog=epi,

@@ -191,8 +191,8 @@ class likelihood(object) :
                     # use is to add interferometer tunable passbands
                     if name.find('_'):
                         # May be -- split off first part
-                        bs = name.split('_')[0].lower()
-                        if bs in ["delta", "box", "alma"]:
+                        bs = name.split('_')[1].lower()
+                        if bs in ["delta", "box", "alma", "gauss"]:
                             # Add it!
                             self._responsewheel.add_special(name)
                         else:

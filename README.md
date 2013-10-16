@@ -60,27 +60,37 @@ complicated format -- you will need to read the documentation of the
 response class), but a default version is also included that should cover
 most of the standard passbands.  
 
-However, this doesn't really work for interferometric observations,
-where the passbands can usually be tuned in all sorts of complicated
-ways.  One way to handle these is to build your own filter wheel file,
-but as an alternative a short specification can be provided as the
-filter name of the form box_cent_width, where cent and width are the
-central frequency and width of a boxcar representation of the filter
-in GHz.  So, for example, box_342_8 is a 8 GHz wide boxcar filter
-centered at 342 GHz.  Delta function passbands are also allowed using
-delta_cent, where, again, cent is the central frequency.  Finally, ALMA
-passbands are allowed using alma_cent where, again, cent is the central
-frequency in GHz.  Only bands 3, 6, and 7 are currently supported, and
-the assumption is that the standard IF ranges are used.  For bands 3 and 7
-this means 3.75 GHz coverage, a 8 GHz gap, then 3.75 GHz coverage, with
-the center of the 8 GHz gap at the central frequency.  For band 6,
-the central gap is 12 GHz.  More complex tunings can't be specified with
-the short specifications.
-
 The currently supported passbands in the default set are MIPS_24um,
 MIPS_70um, MIPS_160um, PACS_70um, PACS_100um, PACS_160um, SPIRE_250um,
 SPIRE_350um, SPIRE_500um, SABOCA_350um, LABOCA_870um, SCUBA2_450um,
 SCUBA2_850um, Bolocam_1.1mm, MAMBO2_1.1mm, and GISMO_2mm.
+
+However, this doesn't really work for interferometric observations,
+where the passbands can usually be tuned in all sorts of complicated
+ways.  One way to handle these is to build your own filter wheel file,
+but as an alternative a short specification can be provided using some
+special codes.
+
+For the most common (boxcar) case, the specification is
+<inst>_box_<cent>_<width> where inst is the instrument name, box specifies a
+boxcar, cent is the central frequency in GHz (or wavelength, see
+below), and width is the width (also in GHz).  So, for example,
+PdBI_135_3.6. Delta function passbands are also allowed using
+<inst>_delta_<cent>, where, again, cent is the central frequency.
+Finally, ALMA type passbands are allowed using <inst>_alma_<cent> where, again,
+cent is the central frequency in GHz.  ALMA band 9 is not supported,
+and the assumption is that the standard IF ranges are used.  For ALMA band
+3, for example, this means 3.75 GHz coverage, a 8 GHz gap, then 3.75
+GHz coverage, with the center of the 8 GHz gap at the central
+frequency.  For band 6, on the other hand, the central gap is 12 GHz.
+More complex tunings require a special built filter file.  Note that
+this usually means the name of your band is something like ALMA_alma_230,
+since alma is both a telescope and a type of passband.  None of the values
+are case sesitive.
+
+It is also possible to specify the units as microns instead of GHz by
+appending um to the first numerical argument -- for example,
+ZSpec_box_1050um_100 is a 100 micron wide box centered at 1050 microns.
 
 ###Examining your results
 You should almost always look at both your actual fit and at
@@ -98,7 +108,7 @@ matplotlib via something like:
     res = mbb_emcee.mbb_results(h5file="test.h5")
     wave, flux, flux_unc = res.data
     p_data = plt.errorbar(wave, flux, yerr=flux_unc, fmt='ro')
-    p_wave = np.arange(wave.min() * 0.5, wave.max() * 1.5, 200)
+    p_wave = np.linspace(wave.min() * 0.5, wave.max() * 1.5, 200)
     p_fit = plt.plot(p_wave, res.best_fit_sed(p_wave), color='blue')
     plt.show()
     h = plt.hist(res.parameter_chain('T/(1+z)'))

@@ -17,6 +17,8 @@ except:
     #Python 3
     basestring = str
 
+special_types = ["delta", "box", "gauss", "alma"]
+
 def response_bb(freq, temperature):
     """Evaluates blackbody fnu at specified frequency and temperature
 
@@ -132,26 +134,26 @@ class response(object):
             spl = inputspec.split('_')
             bs = spl[0].lower()
             if bs == "delta":
-                if len(spl) != 2:
-                    raise ValueError("delta function has too many params")
+                if len(spl) < 2:
+                    raise ValueError("delta needs central frequency")
                 val = float(spl[1])
                 self._setup_delta(val, xtyp, xun)
                 return
             elif bs == "box":
-                if len(spl) != 3:
+                if len(spl) < 3:
                     errstr = "box car needs 2 params in {:s}".format(inputspec)
                     raise ValueError(errstr)
                 xvals, self._resp = self._setup_box(float(spl[1]), 
                                                     float(spl[2]))
             elif bs == "gauss":
-                if len(spl) != 3:
+                if len(spl) < 3:
                     errstr = "gaussian needs 2 params in {:s}".format(inputspec)
                     raise ValueError(errstr)
                 xvals, self._resp = self._setup_gauss(float(spl[1]), 
                                                       float(spl[2]))
 
             elif bs == "alma":
-                if len(spl) != 2:
+                if len(spl) < 2:
                     errstr = "alma needs 1 params in {:s}".format(inputspec)
                     raise ValueError(errstr)
                 xvals, self._resp = self._setup_alma(float(spl[1]),
@@ -178,15 +180,16 @@ class response(object):
         if xnorm <= 0:
             raise ValueError("Non-positive xnorm")
 
-        #Build up wavelength/normwave in microns, freq in GHz
+        # Build up wavelength/normwave in microns, freq in GHz
+        # This should be replaced with the use of astropy.units
         if xtyp == 'wave':
-            if xun == 'angstroms':
+            if xun == 'angstroms' or xun == 'a':
                 self._wave = 1e-4 * xvals
                 self._normwave = 1e-4 * xnorm
-            elif xun == 'microns':
+            elif xun == 'microns' or xun == 'um':
                 self._wave = xvals
                 self._normwave = xnorm
-            elif xun == 'meters':
+            elif xun == 'meters' or xun == 'm':
                 self._wave = 1e6 * xvals
                 self._normwave = 1e6 * xnorm
             else:
@@ -221,6 +224,10 @@ class response(object):
         self._freq = self._freq[idx]
         self._resp = self._resp[idx]
         self._nresp = len(self._resp)
+
+        # Unity normalize the response (this is arbitrary, but convenient
+        # for display purposes)
+        self._resp /= self._resp.max()
 
         # Set up sensitivity type
         if styp == "energy":
@@ -300,11 +307,11 @@ class response(object):
         if val <= 0:
             raise ValueError("Non-positive value")
         if xtyp == 'wave':
-            if xun == 'angstroms':
+            if xun == 'angstroms' or xun == 'a':
                 self._normwave = 1e-4 * val
-            elif xun == 'microns':
+            elif xun == 'microns' or xun == 'um':
                 self._normwave = val
-            elif xun == 'meters':
+            elif xun == 'meters' or xun == 'm':
                 self._normwave = 1e6 * val
             else:
                 errmsg = "Unrecognized wavelength type {:s}"
@@ -382,10 +389,11 @@ class response(object):
         else:
             raise ValueError("Unknown unit type {:s}".format(xtype))
 
-        # Identify band: bands 3, 6, 7; don't support band 9 since it's complex
-        if_low = numpy.array([92.0, 221.0, 283])
-        if_high = numpy.array([108.0, 265.0, 365.0])
-        if_range_bot = numpy.array([4, 4, 6.0])
+        # Identify band: bands 3, 4, 6, 7, 8; don't support band 9 since 
+        # it's more complex (DSB vs. 2SB).  Bands 1, 2, 5, 10 not implemented
+        if_low = numpy.array([92.0, 125, 221, 283, 385])
+        if_high = numpy.array([108.0, 163, 265, 365, 500])
+        if_range_bot = numpy.array([4.0, 4.0, 6, 4, 4])
         wband = numpy.nonzero((cen_freq >= if_low) & (cen_freq <= if_high))[0]
         if len(wband) == 0:
             errmsg = "Unable to identify ALMA band with central freq {:0.1f}"
@@ -569,10 +577,9 @@ class response_set(object):
 
         self._responses = {}
         # Note this loads a default if inputfile is None
-        self._read(inputfile=inputfile, dir=dir) 
+        self.read(inputfile=inputfile, dir=dir) 
     
-
-    def _read(self, inputfile=None, dir=None):
+    def read(self, inputfile=None, dir=None):
         """ Read in responses
 
         Parameters
@@ -584,6 +591,9 @@ class response_set(object):
           Directory to look for responses in; defaults to current directory,
           but is ignored if using default inputfile
  
+        Notes
+        -----
+          This will clear out all previously loaded information.
         """
 
         import astropy.io.ascii
@@ -613,22 +623,78 @@ class response_set(object):
 
         # Read in all the responses
         for dat in data:
-            name = dat[0]
-            resp = response(name)
-            resp.setup(dat[1], dat[2].lower(), dat[3].lower(), dat[4].lower(),
-                       dat[5].lower(), float(dat[6]), float(dat[7]),
-                       dir=indir)
-            self._responses[name] = resp
+            self.add(dat[0], dat[1], dat[2].lower(), dat[3].lower(), 
+                     dat[4].lower(), dat[5].lower(), float(dat[6]), 
+                     float(dat[7]), dir=indir)
 
-    def add_special(self, name, xtype='freq', xunits='GHz',
-                    senstype='energy', normtype='flat', xnorm=250,
-                    normparam=0):
-        """ Add a 'special' filter (boxcar, delta, gaussian, etc.) as described
-        in response.setup"""
+    def add(self, name, spec, xtype, xunits, senstype, normtype, xnorm,
+            normparam, dir=dir):
+        """ Add a filter."""
 
         resp = response(name)
-        resp.setup(name, xtype=xtype, xunits=xunits, senstype=senstype,
-                   normtype=normtype, xnorm=xnorm, normparam=normparam)
+        resp.setup(spec, xtype=xtype, xunits=xunits, senstype=senstype,
+                   normtype=normtype, xnorm=xnorm, normparam=normparam,
+                   dir=dir)
+        self._responses[name] = resp
+
+    def add_special(self, name):
+        """ Add a 'special' filter (boxcar, delta, gaussian, alma, etc.).
+
+        This is a shortcut for adding special filters (boxcar, gaussian,
+        etc.) on the fly.  The language is related to that used by setup,
+        but altered a bit because only a single input is provided
+        (the specification).  As a result, the sensitivity is always
+        assumed to be energy and the normalization flat.
+
+        The format is name_type_values, where type is the special type
+        (box, gauss, etc.), and values are the things needed to specify
+        the type.  On the first value it is possible to specify units
+        (GHz or um) on the first argument -- so ZSpec_box_1050um_100
+        will make a boxcar in wavelength space, but SMA_box_234_16Ghz_8
+        will make one in frequency space.  The default is frequency
+        space (in GHz), since the most common use should be processing
+        interferometric observations.
+        """
+
+        import re
+
+        # Make sure the lead in is one of the recognized types
+        spl = name.split('_')
+        bs = spl[1].lower()
+        if not bs in special_types:
+            errmsg = "Unknown 'special' response type in {:s}"
+            raise ValueError(errmsg.format(name))
+        
+        # Look for units on first argument
+        if len(spl) < 3:
+            raise ValueError("Special type has no numerical spec")
+        firstarg = spl[2].lower()
+        num = re.findall(r'\d+', firstarg)
+        if len(num) == 0:
+            raise ValueError("Special type needs numeric specification")
+        p = re.compile(r'^\d+')
+        firstarg_unit = p.sub("", firstarg)
+        if len(firstarg_unit) == 0:
+            xtype = 'freq'
+            xunit = 'ghz'
+        elif firstarg_unit == 'ghz':
+            xtype = 'freq'
+            xunit = 'ghz'
+        elif firstarg_unit == 'um':
+            xtype = 'wave'
+            xunit = 'microns'
+        else:
+            errstr = "Unable to understand unit specification {:s}"
+            raise ValueError(errstr.format(firstarg_unit))
+
+        # We have to build a setup stype spec
+        newspec = bs + '_' + num[0]
+        if len(spl) > 3:
+            newspec += '_' + '_'.join(spl[3:])
+
+        resp = response(name)
+        resp.setup(newspec, xtype=xtype, xunits=xunit, senstype='energy',
+                   normtype='flat', xnorm=float(num[0]), normparam=0)
         self._responses[name] = resp
 
     def writeToHDF5(self, handle):

@@ -10,6 +10,8 @@ SPIRE_350um     SPIRE_350.txt      wave      microns   energy      power       3
 SPIRE_500um     SPIRE_500.txt      wave      microns   energy      power       500.0    -1.0
 SABOCA_350um	SABOCA_350um.txt   wave      microns   energy      flat        350      0.0
 LABOCA_870um	LABOCA_870um.txt   wave      microns   energy      flat        870      0.0
+SCUBA_450um     SCUBA_450um.txt    wave      microns   energy      flat        450      0.0
+SCUBA_850um     SCUBA_850um.txt    wave      microns   energy      flat        850      0.0
 SCUBA2_450um    SCUBA2_450um.txt   wave      microns   energy      flat        450      0.0
 SCUBA2_850um    SCUBA2_850um.txt   wave      microns   energy      flat        850      0.0
 Bolocam_1.1mm   Bolocam_1100.txt   wave      microns   energy      flat        1100     0.0
