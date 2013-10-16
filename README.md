@@ -62,8 +62,9 @@ most of the standard passbands.
 
 The currently supported passbands in the default set are MIPS_24um,
 MIPS_70um, MIPS_160um, PACS_70um, PACS_100um, PACS_160um, SPIRE_250um,
-SPIRE_350um, SPIRE_500um, SABOCA_350um, LABOCA_870um, SCUBA2_450um,
-SCUBA2_850um, Bolocam_1.1mm, MAMBO2_1.1mm, and GISMO_2mm.
+SPIRE_350um, SPIRE_500um, SABOCA_350um, LABOCA_870um, SCUBA_450um,
+SCUBA_850um, SCUBA2_450um, SCUBA2_850um, Bolocam_1.1mm, MAMBO2_1.1mm, 
+and GISMO_2mm.
 
 However, this doesn't really work for interferometric observations,
 where the passbands can usually be tuned in all sorts of complicated
@@ -72,12 +73,12 @@ but as an alternative a short specification can be provided using some
 special codes.
 
 For the most common (boxcar) case, the specification is
-<inst>_box_<cent>_<width> where inst is the instrument name, box specifies a
+inst_box_cent_width where inst is the instrument name, box specifies a
 boxcar, cent is the central frequency in GHz (or wavelength, see
 below), and width is the width (also in GHz).  So, for example,
 PdBI_135_3.6. Delta function passbands are also allowed using
-<inst>_delta_<cent>, where, again, cent is the central frequency.
-Finally, ALMA type passbands are allowed using <inst>_alma_<cent> where, again,
+inst_delta_cent, where, again, cent is the central frequency.
+Finally, ALMA type passbands are allowed using inst_alma_cent where, again,
 cent is the central frequency in GHz.  ALMA band 9 is not supported,
 and the assumption is that the standard IF ranges are used.  For ALMA band
 3, for example, this means 3.75 GHz coverage, a 8 GHz gap, then 3.75
