@@ -9,6 +9,7 @@ from .likelihood import likelihood
 
 __all__ = ["mbb_fitter"]
 
+
 class mbb_fitter(object):
     """ Does fit"""
 
@@ -19,13 +20,13 @@ class mbb_fitter(object):
                     'peaklam': 5}
 
     """ Parameter names"""
-    _parnames = np.array(['T/(1+z)', 'Beta', 'Lambda0*(1+z)', 
+    _parnames = np.array(['T/(1+z)', 'Beta', 'Lambda0*(1+z)',
                           'Alpha', 'Fnorm'])
 
-
-    def __init__(self, nwalkers=250, photfile=None, covfile=None, 
-                 covextn=0, response=False, responsefile=None, responsedir=None,
-                 wavenorm=500.0, noalpha=False, opthin=False, nthreads=1):
+    def __init__(self, nwalkers=250, photfile=None, covfile=None,
+                 covextn=0, response=False, responsefile=None,
+                 responsedir=None, wavenorm=500.0, noalpha=False,
+                 opthin=False, nthreads=1):
         """
         Parameters
         ----------
@@ -35,7 +36,7 @@ class mbb_fitter(object):
 
         photfile : string
            Text file containing photometry
-        
+
         covfile : string
            FITS file containing covariance matrix. None for no file
 
@@ -70,8 +71,8 @@ class mbb_fitter(object):
         self._wavenorm = float(wavenorm)
         self._nwalkers = int(nwalkers)
         self._nthreads = int(nthreads)
-        self.like = likelihood(photfile=photfile, covfile=covfile, 
-                               covextn=covextn, wavenorm=wavenorm, 
+        self.like = likelihood(photfile=photfile, covfile=covfile,
+                               covextn=covextn, wavenorm=wavenorm,
                                noalpha=noalpha, opthin=opthin,
                                response=response,
                                responsefile=responsefile,
@@ -87,7 +88,7 @@ class mbb_fitter(object):
     def noalpha(self):
         """ Not using blue side power law?"""
         return self._noalpha
-    
+
     @property
     def opthin(self):
         """ Assuming optically thin model?"""
@@ -125,7 +126,7 @@ class mbb_fitter(object):
         ----------
         photfile : string
            Text file containing photometry
-        
+
         covfile : string
            FITS file containing covariance matrix. None for no file
 
@@ -145,7 +146,7 @@ class mbb_fitter(object):
         """
 
         if not responsefile is None:
-            self.like.read_responses(responsefile, 
+            self.like.read_responses(responsefile,
                                      responsedir=responsedir)
 
         self.like.read_phot(photfile)
@@ -187,7 +188,7 @@ class mbb_fitter(object):
 
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
         """
 
@@ -195,18 +196,18 @@ class mbb_fitter(object):
             paramidx = self._param_order[param.lower()]
         else:
             paramidx = int(param)
-            
+
         self._fixed[paramidx] = True
 
     def unfix_param(self, param):
         """Un-fixes the specified parameter.
-        
+
         Parameters
         ----------
 
         param : int or string
           Parameter specification. Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
         """
 
@@ -214,10 +215,10 @@ class mbb_fitter(object):
             paramidx = self._param_order[param.lower()]
         else:
             paramidx = int(param)
-            
+
         self._fixed[paramidx] = False
 
-    def set_lowlim(self, param, val) :
+    def set_lowlim(self, param, val):
         """Sets the specified parameter lower limit to value.
 
         Parameters
@@ -225,30 +226,29 @@ class mbb_fitter(object):
 
         param : int or string
           Parameter specification. Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
         """
         self.like.set_lowlim(param, val)
 
-    def lowlim(self, param) :
+    def lowlim(self, param):
         """Gets the specified parameter lower limit value.
 
         Parameters
         ----------
         param : int or string
           Parameter specification. Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
 
-        Returns 
+        Returns
         -------
         limit : float
           Lower limit on parameter value
         """
         return self.like.lowlim(param)
 
-
-    def set_uplim(self, param, val) :
+    def set_uplim(self, param, val):
         """Sets the specified parameter upper limit to value.
 
         Parameters
@@ -256,7 +256,7 @@ class mbb_fitter(object):
 
         param : int or string
           Parameter specification. Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.  The peak lambda in microns (observer frame)
           can also be used as a parameter (parameter 5, or 'lambda_peak')
         """
@@ -270,7 +270,7 @@ class mbb_fitter(object):
 
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
 
         Returns
@@ -280,23 +280,23 @@ class mbb_fitter(object):
         """
         return self.like.has_uplim(param)
 
-    def uplim(self, param) :
+    def uplim(self, param):
         """Gets the specified parameter upper limit value.
 
         Parameters
         ----------
         param : int or string
           Parameter specification. Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
 
-        Returns 
+        Returns
         -------
         limit : float
           Upper limit on parameter value, or None if there is none
         """
-        return self.like.uplim(param)
 
+        return self.like.uplim(param)
 
     def set_gaussian_prior(self, param, mean, sigma):
         """Sets up a Gaussian prior on the specified parameter.
@@ -306,9 +306,9 @@ class mbb_fitter(object):
 
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
-          parameter.  The peak lambda in microns (observer 
-          frame) can also be used as a parameter (parameter 5, 
+          the parameter list, or a string name for the
+          parameter.  The peak lambda in microns (observer
+          frame) can also be used as a parameter (parameter 5,
           or 'lambda_peak').
 
         mean : float
@@ -327,11 +327,11 @@ class mbb_fitter(object):
 
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
-          parameter.  The peak lambda in microns (observer 
-          frame) can also be used as a parameter (parameter 5, 
+          the parameter list, or a string name for the
+          parameter.  The peak lambda in microns (observer
+          frame) can also be used as a parameter (parameter 5,
           or 'lambda_peak').
-          
+
         Returns
         -------
         has_prior : bool
@@ -347,11 +347,11 @@ class mbb_fitter(object):
 
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
-          parameter.  The peak lambda in microns (observer 
-          frame) can also be used as a parameter (parameter 5, 
+          the parameter list, or a string name for the
+          parameter.  The peak lambda in microns (observer
+          frame) can also be used as a parameter (parameter 5,
           or 'lambda_peak')
-          
+
         Returns
         -------
         tup : tuple or None
@@ -389,17 +389,17 @@ class mbb_fitter(object):
             raise ValueError("Initial values not expected length")
         if len(initsigma) != 5:
             raise ValueError("Initial sigma values not expected length")
-        
+
         # First -- see if any of the initial values lie outside
         # the upper/lower limits.
         outside_limits = [False] * 5
         for i, val in enumerate(initvals):
             #Everything has a lower limit...
-            if val < self.lowlim(i): 
+            if val < self.lowlim(i):
                 outside_limits[i] = True
             elif self.has_uplim(i) and val > self.uplim(i):
                 outside_limits[i] = True
-                
+
         # If any of the things outside the limits are fixed, this
         # is a problem.  Complain.
         fixed_and_outside = np.logical_and(self._fixed, outside_limits)
@@ -408,7 +408,7 @@ class mbb_fitter(object):
                 ', '.join(self._parnames[fixed_and_outside.nonzero()[0]])
             errmsg = "Some fixed parameters outside limits: {:s}"
             raise ValueError(errmsg.format(badparams))
-                                  
+
         # Adjust initial values if necessary.  We try to keep them
         # close to the user provided value, just shifting into the
         # range by a few sigma.  If the range is too small, just
@@ -434,19 +434,19 @@ class mbb_fitter(object):
                     int_init[i] = self.lowlim(i) + 2 * initsigma[i]
             else:
                 int_init[i] = initvals[i]
-                        
+
         # Make p0 (output)
         p0 = np.zeros((self._nwalkers, 5))
         maxiters = 100
         for i in range(5):
             if self._fixed[i]:
-                p0[:,i] = int_init[i] * np.ones(self._nwalkers)
+                p0[:, i] = int_init[i] * np.ones(self._nwalkers)
             else:
                 lwlim = self.lowlim(i)
                 hs_uplim = self.has_uplim(i)
                 uplim = self.uplim(i)
 
-                pvec = initsigma[i] * np.random.randn(self._nwalkers) +\
+                pvec = initsigma[i] * np.random.randn(self._nwalkers) + \
                     int_init[i]
 
                 # Now reject and regenerate anything outside limits
@@ -474,10 +474,9 @@ class mbb_fitter(object):
                         errmsg = "Too many iterations initializing param {:d}"
                         raise Exception(errmsg.format(i))
 
-                p0[:,i] = pvec
+                p0[:, i] = pvec
 
         return p0
-            
 
     def run(self, nburn, nsteps, p0, verbose=False):
         """Do emcee run.
@@ -510,16 +509,18 @@ class mbb_fitter(object):
         # Make sure initial parameters are valid
         for i in range(5):
             # Don't test parameters we don't use
-            if i == 2 and self._opthin: continue
-            if i == 3 and self._noalpha: continue
+            if i == 2 and self._opthin:
+                continue
+            if i == 3 and self._noalpha:
+                continue
             # Limit check
-            if self.has_uplim(i) and p0[:,i].max() > self.uplim(i):
+            if self.has_uplim(i) and p0[:, i].max() > self.uplim(i):
                 errmsg = "Upper limit initial value violation for {:s}"
                 raise ValueError(errmsg.format(self._parnames[i]))
-            if p0[:,i].min() < self.lowlim(i):
+            if p0[:, i].min() < self.lowlim(i):
                 errmsg = "Lower limit initial value violation for {:s}"
                 raise ValueError(errmsg.format(self._parnames[i]))
-                
+
         # Do burn in
         self.sampler.reset()
         self._sampled = False
@@ -543,12 +544,12 @@ class mbb_fitter(object):
 
         if verbose:
             print("  Fit complete")
-            print("   Mean acceptance fraction:", 
+            print("   Mean acceptance fraction:",
                   np.mean(self.sampler.acceptance_fraction))
-            try :
+            try:
                 acor = self.sampler.acor
                 print("   Autocorrelation time: ")
-                msg = "    Number of burn in steps ({:d}) should be larger "+\
+                msg = "    Number of burn in steps ({:d}) should be larger "\
                       "than these"
                 print(msg.format(nburn))
                 print("\tT:        {:f}".format(acor[0]))
@@ -558,5 +559,5 @@ class mbb_fitter(object):
                 if not self._noalpha:
                     print("\talpha:    {:f}".format(acor[3]))
                 print("\tfnorm:    {:f}".format(acor[4]))
-            except ImportError :
+            except ImportError:
                 pass

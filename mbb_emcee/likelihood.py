@@ -13,24 +13,24 @@ except:
     #Python 3
     basestring = str
 
-"""Class holding data, defining likelihood"""
-class likelihood(object) :
 
-    """ Parameter order dictionary.  Lowercased."""
+class likelihood(object):
+    """Class holding data, defining likelihood"""
+
     _param_order = {'t': 0, 't/(1+z)': 0, 'beta': 1, 'lambda0': 2,
                     'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
                     'alpha': 3, 'fnorm': 4, 'f500': 4}
 
-    def __init__(self, photfile=None, covfile=None, covextn=0, 
+    def __init__(self, photfile=None, covfile=None, covextn=0,
                  wavenorm=500.0, noalpha=False, opthin=False,
-                 response=False, responsefile=None, responsedir=None) :
+                 response=False, responsefile=None, responsedir=None):
         """ Object for computing likelihood of a given set of parameters.
 
         Parameters
         ----------
         photfile : string
            Text file containing photometry
-        
+
         covfile : string
            FITS file containing covariance matrix. None for no file
 
@@ -50,7 +50,7 @@ class likelihood(object) :
            Use response integration
 
         responsefile : string
-           Name of file containing response specifications if not using 
+           Name of file containing response specifications if not using
            standard set.  Ignored unless response is set.
 
         responsedir : string
@@ -102,7 +102,7 @@ class likelihood(object) :
         if not photfile is None:
             self.read_phot(photfile)
 
-            if not covfile is None :
+            if not covfile is None:
                 if not isinstance(covfile, basestring):
                     raise TypeError("covfile must be string-like")
                 self.read_cov(covfile, extn=covextn)
@@ -113,7 +113,6 @@ class likelihood(object) :
         else:
             if not covfile is None:
                 raise Exception("Can't pass in covfile if no photfile")
-
 
         self._badval = float("-inf")
 
@@ -136,7 +135,7 @@ class likelihood(object) :
     def response_integrate(self):
         """Is filter integration being used?"""
         return self._response_integrate
-        
+
     def read_responses(self, responsefile=None, responsedir=None):
         """ Read in responses
 
@@ -148,7 +147,7 @@ class likelihood(object) :
 
         responsedir : string
           Directory to look for actual responses in.
-          
+
         Notes
         -----
         Calling this turns on filter integration
@@ -171,7 +170,7 @@ class likelihood(object) :
 
         flux_unc : array like
           Array of flux density uncertainties, in mJy
-        
+
         Notes
         -----
         This wipes out any covariance matrix already present,
@@ -196,18 +195,20 @@ class likelihood(object) :
                             # Add it!
                             self._responsewheel.add_special(name)
                         else:
-                            raise ValueError("Unknown filter response {:s}".format(name))
+                            errstr = "Unknown filter response {:s}"
+                            raise ValueError(errstr.format(name))
                     else:
-                        raise ValueError("Unknown filter response {:s}".format(name))               
+                        errstr = "Unknown filter response {:s}"
+                        raise ValueError(errstr.format(name))
                 self._responses.append(self._responsewheel[name])
 
             self._response_names = [r.name for r in self._responses]
-            self._wave = np.array([resp.effective_wavelength for 
+            self._wave = np.array([resp.effective_wavelength for
                                    resp in self._responses])
         else:
             self._wave = np.asarray(firstarg, dtype=np.float64)
 
-        self._ndata = len(self._wave) 
+        self._ndata = len(self._wave)
         if self._ndata == 0:
             raise ValueError("No elements in wavelength vector")
 
@@ -229,7 +230,6 @@ class likelihood(object) :
         self._data_read = True
         self._has_covmatrix = False
 
-
     def read_phot(self, filename):
         """Reads in the photometry file
 
@@ -250,9 +250,9 @@ class likelihood(object) :
         if not isinstance(filename, basestring):
             raise TypeError("filename must be string-like")
 
-        data = astropy.io.ascii.read(filename,comment='^#')
+        data = astropy.io.ascii.read(filename, comment='^#')
 
-        if len(data) == 0 :
+        if len(data) == 0:
             errstr = "No data read from %s" % filename
             raise IOError(errstr)
 
@@ -273,7 +273,7 @@ class likelihood(object) :
         else:
             return 0
 
-    @property 
+    @property
     def data_wave(self):
         """ The data wavelengths, in microns"""
         if self._data_read:
@@ -281,23 +281,26 @@ class likelihood(object) :
         else:
             return None
 
-    @property 
+    @property
     def response_names(self):
         """ Returns names of responses corresponding to data"""
-        if not hasattr(self, '_response_names'): return None
+        if not hasattr(self, '_response_names'):
+            return None
         return self._response_names
-        
+
     def has_response(self, name):
         """ Is the specified response function available?"""
-        if not hasattr(self, '_responsewheel'): return False
+        if not hasattr(self, '_responsewheel'):
+            return False
         return name in self._responsewheel
 
     def get_response(self, name):
         """ Return the matching response object"""
-        if not hasattr(self, '_responsewheel'): return None
+        if not hasattr(self, '_responsewheel'):
+            return None
         return self._responsewheel[name]
-        
-    @property 
+
+    @property
     def data_flux(self):
         """ The flux densities, in mJy"""
         if self._data_read:
@@ -305,7 +308,7 @@ class likelihood(object) :
         else:
             return None
 
-    @property 
+    @property
     def data_flux_unc(self):
         """ The uncertainties in the flux densities, in mJy.
 
@@ -342,29 +345,28 @@ class likelihood(object) :
         if covmatrix.shape[0] != covmatrix.shape[1]:
             errstr = "Covariance matrix from is not square: %d by %d"
             raise ValueError(errstr % covmatrix.shape)
-        
+
         if covmatrix.shape[0] != self._ndata:
-            errstr = "Covariance matrix doesn't have same number of "+\
-                "datapoints as photometry; %d vs. %d"
-            raise ValueError(errstr % (covmatrix.shape[0], self._ndata))
+            errstr = "Covariance matrix doesn't have same number of "\
+                     "datapoints as photometry; {0:d} vs. {1:d}"
+            raise ValueError(errstt.format(covmatrix.shape[0], self._ndata))
 
         self._covmatrix = covmatrix
         self._invcovmatrix = np.linalg.inv(self._covmatrix)
         self._has_covmatrix = True
 
-
-    def read_cov(self, filename, extn=0) :
+    def read_cov(self, filename, extn=0):
         """Reads in the covariance matrix from a FITS file.
-        
+
         Parameters
         ----------
         filename : string
           File to read covariance matrix from
-        
+
         extn : int
           Extension to look for covariance matrix in
         """
-        
+
         import astropy.io.fits
 
         if not self._data_read:
@@ -400,16 +402,16 @@ class likelihood(object) :
         ----------
         paramname : string
           Name of parameter (e.g., 'beta')
-        
+
         Returns
         -------
         index : int
           Parameter index
         """
-        
+
         return self._param_order[paramname]
 
-    def set_lowlim(self, param, val) :
+    def set_lowlim(self, param, val):
         """Sets the specified parameter lower limit to value.
 
         Parameters
@@ -417,7 +419,7 @@ class likelihood(object) :
 
         param : int or string
           Parameter specification. Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
         """
 
@@ -434,7 +436,7 @@ class likelihood(object) :
 
         param : int or string
           Parameter specification. Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
         """
 
@@ -442,7 +444,7 @@ class likelihood(object) :
             paramidx = self._param_order[param.lower()]
         else:
             paramidx = int(param)
-            
+
         return self._lowlim[paramidx]
 
     @property
@@ -456,7 +458,7 @@ class likelihood(object) :
         """
         return self._lowlim
 
-    def set_uplim(self, param, val) :
+    def set_uplim(self, param, val):
         """Sets the specified parameter upper limit to value.
 
         Parameters
@@ -464,9 +466,9 @@ class likelihood(object) :
 
         param : int or string
           Parameter specification. Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
-        
+
         val : float
           The upper limit to set.
         """
@@ -487,7 +489,7 @@ class likelihood(object) :
 
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
 
         Returns
@@ -499,7 +501,7 @@ class likelihood(object) :
             paramidx = self._limprior_order[param.lower()]
         else:
             paramidx = int(param)
-        
+
         return self._has_uplim[paramidx]
 
     def uplim(self, param):
@@ -510,7 +512,7 @@ class likelihood(object) :
 
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
 
         Returns
@@ -522,14 +524,15 @@ class likelihood(object) :
             paramidx = self._limprior_order[param.lower()]
         else:
             paramidx = int(param)
-        
-        if not self._has_uplim[paramidx]: return None
+
+        if not self._has_uplim[paramidx]:
+            return None
         return self._uplim[paramidx]
 
     @property
     def has_uplims(self):
         return self._has_uplim
-    
+
     @property
     def uplims(self):
         return self._uplim
@@ -542,9 +545,9 @@ class likelihood(object) :
 
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
-          parameter.  The parameters are the usual (T, 
-          beta, lambda0, alpha, fnorm) plus the peak 
+          the parameter list, or a string name for the
+          parameter.  The parameters are the usual (T,
+          beta, lambda0, alpha, fnorm) plus the peak
           wavelength in microns
 
         mean : float
@@ -572,7 +575,7 @@ class likelihood(object) :
     @property
     def gprior_means(self):
         return self._gprior_mean
-    
+
     @property
     def gprior_sigmas(self):
         return self._gprior_sigma
@@ -589,16 +592,16 @@ class likelihood(object) :
 
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
-          parameter.  The parameters are the usual (T, beta, 
+          the parameter list, or a string name for the
+          parameter.  The parameters are the usual (T, beta,
           lambda0, alpha, fnorm) plus the peak wavelength in microns
-          
+
         Returns
         -------
         has_prior : bool
           True if a Gaussian prior is set, False otherwise
         """
-        
+
         if isinstance(param, str):
             paramidx = self._limprior_order[param.lower()]
         else:
@@ -614,28 +617,29 @@ class likelihood(object) :
 
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
-          parameter.  The parameters are the usual (T, beta, 
+          the parameter list, or a string name for the
+          parameter.  The parameters are the usual (T, beta,
           lambda0, alpha, fnorm) plus the peak wavelength in microns
-          
+
         Returns
         -------
         tup : tuple or None
           Mean, variance if set, None otherwise
         """
-        
-        if not self._any_gprior: return None
+
+        if not self._any_gprior:
+            return None
 
         if isinstance(param, str):
             paramidx = self._limprior_order[param.lower()]
         else:
             paramidx = int(param)
-            
-        if not self._has_gprior[paramidx]: return None
+
+        if not self._has_gprior[paramidx]:
+            return None
         return (self._gprior_mean[paramidx], self._gprior_sigma[paramidx])
 
-
-    def _check_lowlim(self,pars) :
+    def _check_lowlim(self, pars):
         """Checks to see if a given parameter set passes the lower limits.
 
         Parameters
@@ -664,7 +668,7 @@ class likelihood(object) :
 
         return True
 
-    def _uplim_prior(self,pars):
+    def _uplim_prior(self, pars):
         """ Gets log likelihood of upper limit priors
 
         Parameters
@@ -703,16 +707,15 @@ class likelihood(object) :
 
         # Peak lambda
         if self._has_uplim[5]:
-            val = self._sed.max_wave() # _set_sed had better have been called..
+            val = self._sed.max_wave()  # _set_sed had better have been called
             lim = self._uplim[5]
             if val > lim:
                 limvar = (0.02 * (lim))**2
                 logpenalty -= 0.5*(val - lim)**2 / limvar
 
-
         return logpenalty
 
-    def _gprior(self,pars):
+    def _gprior(self, pars):
         """ Gets log likelihood of Gaussian priors
 
         Parameters
@@ -732,7 +735,7 @@ class likelihood(object) :
 
         if not self._any_gprior:
             return 0.0
-        
+
         penalty = 0.0
         # Parameter priors
         for idx, val in enumerate(pars):
@@ -744,7 +747,7 @@ class likelihood(object) :
         if self._has_gprior[5]:
             delta = self._sed.max_wave() - self._gprior_mean[5]
             penalty -= 0.5 * self._gprior_ivar[5] * delta**2
-        
+
         return penalty
 
     def _set_sed(self, pars):
@@ -758,11 +761,10 @@ class likelihood(object) :
 
         if len(pars) != 5:
             raise ValueError("pars is not of expected length 5")
-        self._sed = modified_blackbody(pars[0], pars[1], pars[2], pars[3], 
-                                       pars[4], wavenorm=self._wavenorm, 
+        self._sed = modified_blackbody(pars[0], pars[1], pars[2], pars[3],
+                                       pars[4], wavenorm=self._wavenorm,
                                        noalpha=self._noalpha,
                                        opthin=self._opthin)
-        
 
     def get_sed(self, pars, wave):
         """ Get the model SED at the specified wavelengths for a set of params.
@@ -784,8 +786,7 @@ class likelihood(object) :
         self._set_sed(pars)
         return self._sed(wave)
 
-
-    def __call__(self, pars) :
+    def __call__(self, pars):
         """ Gets log likelihood of the parameters.
 
         Parameters
@@ -798,17 +799,18 @@ class likelihood(object) :
         log_likelihood : float
           log P(pars | data), including priors and limits.
         """
-        
+
         # First check limits
         # Return large negative number if bad
-        if not self._check_lowlim(pars): return self._badval
+        if not self._check_lowlim(pars):
+            return self._badval
 
         # Set up SED model
         self._set_sed(pars)
 
         # Get model fluxes for comparison with data
         if self._response_integrate:
-            model_flux = np.array([resp(self._sed) for 
+            model_flux = np.array([resp(self._sed) for
                                    resp in self._responses])
         else:
             model_flux = self._sed(self._wave)

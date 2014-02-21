@@ -5,18 +5,19 @@ import cython
 cimport numpy as np
 from libc.math cimport expm1
 
-def fnueval_thin_noalpha(np.ndarray[np.float64_t, ndim=1] freq, double T, 
+
+def fnueval_thin_noalpha(np.ndarray[np.float64_t, ndim=1] freq, double T,
                          double beta, double normfac):
     """ Evaluate fnu for optically thin, no alpha model"""
 
     assert freq.dtype == np.float64
-    cdef np.float64_t h = 6.6260693e-34 #J/s
-    cdef np.float64_t k = 1.3806505e-23 #J/K
+    cdef np.float64_t h = 6.6260693e-34  # J/s
+    cdef np.float64_t k = 1.3806505e-23  # J/K
     cdef np.float64_t hokt9 = 1e9 * h / (k * T)
 
     cdef int nfreq = freq.shape[0]
     cdef np.float64_t bp3 = beta + 3.0
-    cdef np.ndarray[np.float64_t, ndim=1] retval =\
+    cdef np.ndarray[np.float64_t, ndim=1] retval = \
         np.zeros(nfreq, dtype=np.float64)
 
     for i in range(nfreq):
@@ -25,20 +26,21 @@ def fnueval_thin_noalpha(np.ndarray[np.float64_t, ndim=1] freq, double T,
 
     return retval
 
+
 @cython.boundscheck(False)
-def fnueval_thin_walpha(np.ndarray[np.float64_t, ndim=1] freq, double T, 
-                        double beta, double alpha, double normfac, 
+def fnueval_thin_walpha(np.ndarray[np.float64_t, ndim=1] freq, double T,
+                        double beta, double alpha, double normfac,
                         double xmerge, double kappa):
     """ Evaluate fnu for optically thin, with alpha model"""
-	
+
     assert freq.dtype == np.float64
-    cdef np.float64_t h = 6.6260693e-34 #J/s
-    cdef np.float64_t k = 1.3806505e-23 #J/K
+    cdef np.float64_t h = 6.6260693e-34  # J/s
+    cdef np.float64_t k = 1.3806505e-23  # J/K
     cdef np.float64_t hokt9 = 1e9 * h / (k * T)
 
     cdef int nfreq = freq.shape[0]
     cdef np.float64_t bp3 = beta + 3.0
-    cdef np.ndarray[np.float64_t, ndim=1] retval =\
+    cdef np.ndarray[np.float64_t, ndim=1] retval = \
         np.zeros(nfreq, dtype=np.float64)
 
     for i in range(nfreq):
@@ -52,22 +54,22 @@ def fnueval_thin_walpha(np.ndarray[np.float64_t, ndim=1] freq, double T,
 
 
 @cython.boundscheck(False)
-def fnueval_thick_noalpha(np.ndarray[np.float64_t, ndim=1] freq, double T, 
+def fnueval_thick_noalpha(np.ndarray[np.float64_t, ndim=1] freq, double T,
                           double beta, double x0, double normfac):
-    """ Evaluate fnu for optically thick, no alpha model"""	
+    """ Evaluate fnu for optically thick, no alpha model"""
 
     assert freq.dtype == np.float64
-    cdef np.float64_t h = 6.6260693e-34 #J/s
-    cdef np.float64_t k = 1.3806505e-23 #J/K
+    cdef np.float64_t h = 6.6260693e-34  # J/s
+    cdef np.float64_t k = 1.3806505e-23  # J/K
     cdef np.float64_t hokt9 = 1e9 * h / (k * T)
 
     cdef int nfreq = freq.shape[0]
     cdef int i
     cdef np.float64_t cx
     cdef np.float64_t x0b
-    cdef np.ndarray[np.float64_t, ndim=1] retval =\
+    cdef np.ndarray[np.float64_t, ndim=1] retval = \
         np.zeros(nfreq, dtype=np.float64)
- 
+
     for i in range(nfreq):
         cx = hokt9 * freq[i]
         x0b = (cx / x0)**beta
@@ -75,25 +77,25 @@ def fnueval_thick_noalpha(np.ndarray[np.float64_t, ndim=1] freq, double T,
 
     return retval
 
+
 @cython.boundscheck(False)
-def fnueval_thick_walpha(np.ndarray[np.float64_t, ndim=1] freq, double T, 
-                         double beta, double x0, double alpha, double normfac, 
+def fnueval_thick_walpha(np.ndarray[np.float64_t, ndim=1] freq, double T,
+                         double beta, double x0, double alpha, double normfac,
                          double xmerge, double kappa):
     """ Evaluate fnu for optically thick, with alpha model"""
 
     assert freq.dtype == np.float64
 
-    cdef np.float64_t h = 6.6260693e-34 #J/s
-    cdef np.float64_t k = 1.3806505e-23 #J/K
+    cdef np.float64_t h = 6.6260693e-34  # J/s
+    cdef np.float64_t k = 1.3806505e-23  # J/K
     cdef np.float64_t hokt9 = 1e9 * h / (k * T)
 
     cdef int nfreq = freq.shape[0]
     cdef int i
     cdef np.float64_t cx
     cdef np.float64_t x0b
-    cdef np.ndarray[np.float64_t, ndim=1] retval =\
+    cdef np.ndarray[np.float64_t, ndim=1] retval = \
         np.zeros(nfreq, dtype=np.float64)
-    
 
     for i in range(nfreq):
         cx = hokt9 * freq[i]
