@@ -34,7 +34,7 @@ class mbb_results(object):
                     'lambda0*(1+z)': 2, 'lambda_0': 2, 'lambda_0*(1+z)': 2,
                     'alpha': 3, 'fnorm': 4, 'f500': 4}
 
-    def __init__(self, fit=None, h5file=None, redshift=None, lumdist=None, 
+    def __init__(self, fit=None, h5file=None, redshift=None, lumdist=None,
                  cosmo_type='WMAP9'):
         """
         Parameters
@@ -43,9 +43,9 @@ class mbb_results(object):
           Fit object
 
         h5file : string
-          Name of HDF5 file to load from previously saved fit.  You can't 
+          Name of HDF5 file to load from previously saved fit.  You can't
           provide this in combination with any of the other variables.
-          
+
         redshift : float
           Redshift of source.  Necessary if you plan to compute
           dustmass, L_IR, or L_AGN
@@ -62,13 +62,13 @@ class mbb_results(object):
         # Make sure user isn't trying to specify too much
         if not h5file is None:
             if not fit is None:
-                raise Exception("It doesn't make sense to provide h5file"\
+                raise Exception("It doesn't make sense to provide h5file"
                                 " and a fit to process")
             if not redshift is None:
-                raise Exception("It doesn't make sense to provide h5file"\
+                raise Exception("It doesn't make sense to provide h5file"
                                 " and the redshift")
             if not lumdist is None:
-                raise Exception("It doesn't make sense to provide h5file"\
+                raise Exception("It doesn't make sense to provide h5file"
                                 " and the lumdist")
 
         self._fitset = False
@@ -92,7 +92,7 @@ class mbb_results(object):
                 self._has_lumdist = False
             else:
                 self._has_lumdist = True
-                if isinstance (lumdist, u.Quantity):
+                if isinstance(lumdist, u.Quantity):
                     self._lumdist = lumdist.to(u.Mpc)
                 else:
                     self._lumdist = u.Quantity(float(lumdist), u.Mpc)
@@ -141,7 +141,7 @@ class mbb_results(object):
             self._has_covmatrix = True
             self._covmatrix = fit.like.data_covmatrix
             self._invcovmatrix = fit.like.data_invcovmatrix
-            self._data_flux_unc = fit.like.data_flux_unc # diag of cov
+            self._data_flux_unc = fit.like.data_flux_unc  # diag of cov
         else:
             self._has_covmatrix = False
             self._data_flux_unc = fit.like.data_flux_unc
@@ -181,38 +181,48 @@ class mbb_results(object):
 
     @property
     def redshift(self):
+        """ Redshift"""
         return self._z
 
     @property
     def opthin(self):
-        if not self._fitset: return None
+        """ Was an optically thin model assumed?"""
+        if not self._fitset:
+            return None
         return self._opthin
 
     @property
     def noalpha(self):
-        if not self._fitset: return None
+        """ Was alpha not used?"""
+        if not self._fitset:
+            return None
         return self._noalpha
 
     @property
     def wavenorm(self):
-        if not self._fitset: return None
+        """ Wavelength (obs frame) of normalization"""
+        if not self._fitset:
+            return None
         return self._wavenorm
 
     @property
     def response_integrate(self):
-        if not self._fitset: return None
         """Was response integration in use?"""
+        if not self._fitset:
+            return None
         return self._response_integrate
 
     @property
     def cosmo_type(self):
+        """ Type of cosmology used"""
         return self._cosmo_type
 
     @property
     def cosmology(self):
         """ Return the current cosmology"""
         if not self._cosmo_type in astropy.cosmology.parameters.available:
-            raise ValueError("Unknown cosmology type: {:s}".format(self._cosmo_type))
+            raise ValueError("Unknown cosmology type: {:s}".
+                             format(self._cosmo_type))
         return getattr(astropy.cosmology, self._cosmo_type)
 
     @property
@@ -223,7 +233,7 @@ class mbb_results(object):
         else:
             if self._z is None:
                 raise Exception("Need redshift to be set to compute lumdist")
-            if self._z <= -1: # Not okay
+            if self._z <= -1:  # Not okay!
                 errmsg = "Redshift is less than -1: {:f}"
                 raise ValueError(errmsg.format(self._z))
             dl = self.cosmology.luminosity_distance(self._z)
@@ -243,7 +253,8 @@ class mbb_results(object):
           index into lnprobability
         """
 
-        if not self._fitset: return None
+        if not self._fitset:
+            return None
         return self._best_fit
 
     @property
@@ -255,8 +266,9 @@ class mbb_results(object):
         chisq : float
           The chi2 of the best fitting point.
         """
-        
-        if not self._fitset: return None
+
+        if not self._fitset:
+            return None
         return -2.0 * self._best_fit[1]
 
     def best_fit_sed(self, wave):
@@ -274,10 +286,11 @@ class mbb_results(object):
           the wavelengths specified by wave
          """
 
-        if not self._fitset: return None
+        if not self._fitset:
+            return None
         pars = self._best_fit[0]
-        sed = modified_blackbody(pars[0], pars[1], pars[2], pars[3], 
-                                 pars[4], wavenorm=self._wavenorm, 
+        sed = modified_blackbody(pars[0], pars[1], pars[2], pars[3],
+                                 pars[4], wavenorm=self._wavenorm,
                                  noalpha=self._noalpha,
                                  opthin=self._opthin)
         return sed(wave)
@@ -286,16 +299,15 @@ class mbb_results(object):
     def data(self):
         """ Get tuple of data wavelengths, flux densities, uncertainties"""
 
-        if not self._fitset: return None
-        return (self._data_wave, self._data_flux,
-                self._data_flux_unc)
+        if not self._fitset:
+            return None
+        return (self._data_wave, self._data_flux, self._data_flux_unc)
 
     @property
     def covmatrix(self):
         """ Get covariance matrix, or None if none present"""
 
-        if not self._fitset: return None
-        if not self._has_covmatrix:
+        if not self._fitset or not self._has_covmatrix:
             return None
         return self._covmatrix
 
@@ -323,7 +335,7 @@ class mbb_results(object):
           Mean, upper uncertainty, lower uncertainty.
         """
 
-        if not self._fitset: 
+        if not self._fitset:
             raise Exception("Fit not available")
 
         pcnt = float(percentile)
@@ -331,7 +343,7 @@ class mbb_results(object):
             raise ValueError("Invalid percentile {:f}".format(pcnt))
 
         aint = copy.deepcopy(array)
-        
+
         # Slice off ends if needed
         if (not lowlim is None) or (not uplim is None):
             if lowlim is None:
@@ -342,7 +354,8 @@ class mbb_results(object):
                 cond = np.logical_and(aint >= float(lowlim),
                                       aint <= float(uplim)).nonzero()[0]
             if len(cond) == 0:
-                raise Exception("No elements survive lower/upper limit clipping")
+                raise Exception("No elements survive lower/upper "
+                                "limit clipping")
             if len(cond) != len(aint):
                 aint = aint[cond]
 
@@ -353,7 +366,7 @@ class mbb_results(object):
         lowidx = int(round(pval * na))
         lowval = aint[lowidx]
         upidx = int(round((1.0 - pval) * na))
-        upval  = aint[upidx]
+        upval = aint[upidx]
         return np.array([mnval, upval-mnval, mnval-lowval])
 
     def parameter_chain(self, param):
@@ -370,7 +383,8 @@ class mbb_results(object):
           Flattened chain for specified parameter
         """
 
-        if not self._fitset: return None
+        if not self._fitset:
+            return None
 
         if isinstance(param, str):
             paridx = self._param_order[param.lower()]
@@ -379,7 +393,7 @@ class mbb_results(object):
             if paridx < 0 or paridx > 5:
                 raise ValueError("invalid parameter index {:d}".format(paridx))
 
-        return self.chain[:,:,paridx].flatten()
+        return self.chain[:, :, paridx].flatten()
 
     def par_cen(self, param, percentile=68.3, lowlim=None, uplim=None):
         """ Gets the central confidence interval for the parameter
@@ -388,7 +402,7 @@ class mbb_results(object):
         ----------
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
 
         percentile : float
@@ -400,7 +414,7 @@ class mbb_results(object):
 
         uplim : float
           Lower limit for parameter to include in computation
-          
+
         Returns
         -------
         ret : ndarray
@@ -409,11 +423,12 @@ class mbb_results(object):
           Percentile of limit to compute
         """
 
-        if not self._fitset: return None
+        if not self._fitset:
+            return None
         if percentile <= 0 or percentile >= 100.0:
             raise ValueError("percentile needs to be between 0 and 100")
 
-        return self._parcen_internal(self.parameter_chain(param), 
+        return self._parcen_internal(self.parameter_chain(param),
                                      percentile, lowlim=lowlim, uplim=uplim)
 
     def par_lowlim(self, param, percentile=68.3):
@@ -421,7 +436,7 @@ class mbb_results(object):
 
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
 
         percentile : float
@@ -433,7 +448,8 @@ class mbb_results(object):
           Lower limit on parameter
         """
 
-        if not self._fitset: return None
+        if not self._fitset:
+            return None
         if isinstance(param, str):
             paridx = self._param_order[param.lower()]
         else:
@@ -453,7 +469,7 @@ class mbb_results(object):
 
         param : int or string
           Parameter specification.  Either an index into
-          the parameter list, or a string name for the 
+          the parameter list, or a string name for the
           parameter.
 
         percentile : float
@@ -465,7 +481,8 @@ class mbb_results(object):
           Upper limit on parameter
         """
 
-        if not self._fitset: return None
+        if not self._fitset:
+            return None
         if isinstance(param, str):
             paridx = self._param_order[param.lower()]
         else:
@@ -476,7 +493,7 @@ class mbb_results(object):
         if percentile <= 0 or percentile >= 100.0:
             raise ValueError("percentile needs to be between 0 and 100")
 
-        svals = self.chain[:,:,paridx].flatten()
+        svals = self.chain[:, :, paridx].flatten()
         svals.sort()
         return svals[round(0.01 * percentile * len(svals))]
 
@@ -487,8 +504,9 @@ class mbb_results(object):
     @property
     def peaklambda_chain(self):
         """ Get flattened chain of peak lambda values in microns"""
-        
-        if not self._has_peaklambda: return None
+
+        if not self._has_peaklambda:
+            return None
         return self.peaklambda.flatten()
 
     def peaklambda_cen(self, percentile=68.3, lowlim=None, uplim=None):
@@ -508,48 +526,50 @@ class mbb_results(object):
         Returns
         -------
         res: ndarray
-          A 3 element array of the central value, upper uncertainty, 
+          A 3 element array of the central value, upper uncertainty,
           and lower uncertainty of the peak observer frame
           wavelength in microns.
         """
-        
-        if not self._has_peaklambda: return None
+
+        if not self._has_peaklambda:
+            return None
         return self._parcen_internal(self.peaklambda.flatten(), percentile,
                                      lowlim=lowlim, uplim=uplim)
 
     def compute_peaklambda(self):
-        """ Compute the observer frame wavelength of peak emission in microns from chain"""
+        """ Compute the observer frame wavelength of peak emission
+        in microns from chain"""
 
         shp = self.chain.shape[0:2]
         self.peaklambda = np.empty(shp, dtype=np.float)
         for walkidx in range(shp[0]):
             # Do first step
-            prevstep = self.chain[walkidx,0,:]
+            prevstep = self.chain[walkidx, 0, :]
             sed = modified_blackbody(prevstep[0], prevstep[1], prevstep[2],
-                                     prevstep[3], prevstep[4], 
+                                     prevstep[3], prevstep[4],
                                      opthin=self.opthin,
                                      noalpha=self.noalpha)
             self.peaklambda[walkidx, 0] = sed.max_wave()
-            
+
             #Now other steps
             for stepidx in range(1, shp[1]):
-                currstep = self.chain[walkidx,stepidx,:]
+                currstep = self.chain[walkidx, stepidx, :]
                 if np.allclose(prevstep, currstep):
                     # Repeat, so avoid re-computation
                     self.peaklambda[walkidx, stepidx] = \
-                        self.peaklambda[walkidx, stepidx-1]
+                        self.peaklambda[walkidx, stepidx - 1]
                 else:
-                    sed = modified_blackbody(currstep[0], currstep[1], 
-                                             currstep[2], currstep[3], 
-                                             currstep[4], 
+                    sed = modified_blackbody(currstep[0], currstep[1],
+                                             currstep[2], currstep[3],
+                                             currstep[4],
                                              opthin=self.opthin,
                                              noalpha=self.noalpha)
-                    self.peaklambda[walkidx, stepidx] =\
+                    self.peaklambda[walkidx, stepidx] = \
                         sed.max_wave()
                     prevstep = currstep
 
         self._has_peaklambda = True
-                
+
     @property
     def has_lir(self):
         return self._has_lir
@@ -562,8 +582,9 @@ class mbb_results(object):
     @property
     def lir_chain(self):
         """ Get flattened chain of l_ir values in 10^12 solar luminosities."""
-        
-        if not self._has_lir: return None
+
+        if not self._has_lir:
+            return None
         return self.lir.flatten()
 
     def lir_cen(self, percentile=68.3, lowlim=None, uplim=None):
@@ -583,12 +604,13 @@ class mbb_results(object):
         Returns
         -------
         res : ndarray
-          A 3 element array of the central value, upper uncertainty, 
+          A 3 element array of the central value, upper uncertainty,
           and lower uncertainty of the IR luminosity (8-1000um)
           in 10^12 solar luminosities, or None if the L_IR has
           not been computed
         """
-        if not self._has_lir: return None
+        if not self._has_lir:
+            return None
         return self._parcen_internal(self.lir.flatten(), percentile,
                                      lowlim=lowlim, uplim=uplim)
 
@@ -604,7 +626,7 @@ class mbb_results(object):
           Maximum wavelength of L_IR integration, in microns
 
         maxidx : int
-          Maximum index in each walker to use. 
+          Maximum index in each walker to use.
 
         Notes
         -----
@@ -612,7 +634,7 @@ class mbb_results(object):
         42.5-112.5um instead.
         """
 
-        if not self._fitset: 
+        if not self._fitset:
             raise Exception("Fit results not loaded")
 
         if self._z is None:
@@ -628,11 +650,11 @@ class mbb_results(object):
         if self._lir_min > self._lir_max:
             self._lir_min, self._lir_max = self._lir_max, self._lir_min
 
-        # 4*pi*dl^2/L_sun in cgs -- so the output will be in 
+        # 4*pi*dl^2/L_sun in cgs -- so the output will be in
         # solar luminosities; the prefactor is
         # 4 * pi * mpc_to_cm^2/L_sun
-        dl = self.lumdist.value # in Mpc
-        lirprefac = 3.11749657e4 * dl**2 # Also converts to 10^12 lsolar
+        dl = self.lumdist.value  # in Mpc
+        lirprefac = 3.11749657e4 * dl**2  # Also converts to 10^12 lsolar
 
         # L_IR defined as between 8 and 1000 microns (rest)
         integrator = mbb_freqint(self._z, self._lir_min, self._lir_max,
@@ -643,19 +665,19 @@ class mbb_results(object):
         # Explicitly check for repeats
         shp = self.chain.shape[0:2]
         steps = shp[1]
-        if not maxidx is None:
-            if maxidx < steps: steps = maxidx
-        self.lir = np.empty((shp[0],steps), dtype=np.float)
+        if not maxidx is None and maxidx < steps:
+            steps = maxidx
+        self.lir = np.empty((shp[0], steps), dtype=np.float)
         for walkidx in range(shp[0]):
             # Do first step
-            prevstep = self.chain[walkidx,0,:]
-            self.lir[walkidx,0] = \
+            prevstep = self.chain[walkidx, 0, :]
+            self.lir[walkidx, 0] = \
                 lirprefac * integrator(prevstep)
             for stepidx in range(1, steps):
-                currstep = self.chain[walkidx,stepidx,:]
+                currstep = self.chain[walkidx, stepidx, :]
                 if np.allclose(prevstep, currstep):
                     # Repeat, so avoid re-computation
-                    self.lir[walkidx, stepidx] =\
+                    self.lir[walkidx, stepidx] = \
                         self.lir[walkidx, stepidx-1]
                 else:
                     # New step
@@ -667,6 +689,7 @@ class mbb_results(object):
 
     @property
     def has_dustmass(self):
+        """ Has dustmass been computed?"""
         return self._has_dustmass
 
     @property
@@ -683,7 +706,8 @@ class mbb_results(object):
     def dustmass_chain(self):
         """ Get flattened chain of dustmass values in 10^8 solar masses"""
 
-        if not self._has_dustmass: return None
+        if not self._has_dustmass:
+            return None
         return self.dustmass.flatten()
 
     def dustmass_cen(self, percentile=68.3, lowlim=None, uplim=None):
@@ -703,29 +727,29 @@ class mbb_results(object):
         Returns
         -------
         res: ndarray
-          A 3 element array of the central value, upper uncertainty, 
+          A 3 element array of the central value, upper uncertainty,
           and lower uncertainty of the dust mass in 10^8 solar masses,
           or None if not computed.
         """
 
-        if not self._has_dustmass: return None
+        if not self._has_dustmass:
+            return None
         return self._parcen_internal(self.dustmass.flatten(), percentile,
                                      lowlim=lowlim, uplim=uplim)
 
-
     def _dmass_calc(self, step, opz, bnu_fac, temp_fac, knu_fac,
                     opthin, dl2):
-        """Internal function to comput dustmass in 10^8 M_sun, 
+        """Internal function to comput dustmass in 10^8 M_sun,
         given various pre-computed values"""
 
-        msolar8 = 1.97792e41 ## mass of the sun*10^8 in g
+        msolar8 = 1.97792e41  # mass of the sun*10^8 in g
         T = step[0] * opz
         beta = step[1]
-        S_nu = step[4] * 1e-26 # to erg / s-cm^2-Hz from mJy
-        B_nu = bnu_fac / math.expm1(temp_fac / T) #Planck function
-        #Scale kappa with freq (obs frame ok).  Factor of 10 is
-        # m^2 kg^-1 -> cm^2 g^-1 conversion
-        K_nu = 10.0 * self._kappa * knu_fac**(-beta) 
+        S_nu = step[4] * 1e-26  # to erg / s-cm^2-Hz from mJy
+        B_nu = bnu_fac / math.expm1(temp_fac / T)  # Planck function
+        # Scale kappa with freq (obs frame ok).  Factor of 10 is
+        #  m^2 kg^-1 -> cm^2 g^-1 conversion
+        K_nu = 10.0 * self._kappa * knu_fac**(-beta)
         dustmass = dl2 * S_nu / (opz * K_nu * B_nu * msolar8)
         if not opthin:
             tau_nu = (step[2] / self._wavenorm)**beta
@@ -743,9 +767,9 @@ class mbb_results(object):
           2.64, is from Dunne et al. 2003 at 125um.
 
         kappa_wave : float
-          The rest frame wavelength that kappa is defined at, in microns.  
+          The rest frame wavelength that kappa is defined at, in microns.
           The default value corresponds to the kappa default.
-        
+
         maxidx : int
           Maximum index in each walker to use.  Ignored if threading.
         """
@@ -764,51 +788,50 @@ class mbb_results(object):
         if self._kappa_wave <= 0:
             errmsg = "Invalid (non-positive) kappa wavelength {:f}"
             raise ValueError(errmsg.format(self._kappa_wave))
-        
 
         dl = self.lumdist.to(u.cm).value
         dl2 = dl**2
         opz = 1.0 + self._z
 
-        wavenorm_rest = self.wavenorm / opz # in um
-        nunorm_rest = 299792458e6 / wavenorm_rest # in Hz
+        wavenorm_rest = self.wavenorm / opz  # in um
+        nunorm_rest = 299792458e6 / wavenorm_rest  # in Hz
 
         # Precompute some quantities for evaluating the Planck function
         # h nu / k and 2 h nu^3 / c^2
-        temp_fac = 6.6260693e-27 * nunorm_rest / 1.38065e-16  #h nu / k
+        temp_fac = 6.6260693e-27 * nunorm_rest / 1.38065e-16  # h nu / k
         bnu_fac = 2 * 6.6260693e-27 * nunorm_rest**3 / 299792458e2**2
 
-        # Work out dust opacity factor. 
+        # Work out dust opacity factor.
         knu_fac = wavenorm_rest / self._kappa_wave
 
-        msolar8 = 1.97792e41 ## mass of the sun*10^8 in g
+        msolar8 = 1.97792e41  # mass of the sun*10^8 in g
 
         shp = self.chain.shape[0:2]
         steps = shp[1]
-        if not maxidx is None:
-            if maxidx < steps: steps = maxidx
-        self.dustmass = np.empty((shp[0],steps), dtype=np.float)
+        if not maxidx is None and maxidx < steps:
+            steps = maxidx
+        self.dustmass = np.empty((shp[0], steps), dtype=np.float)
         for walkidx in range(shp[0]):
             # Do first step
-            prevstep = self.chain[walkidx,0,:]
-            self.dustmass[walkidx,0] = \
-                self._dmass_calc(prevstep, opz, bnu_fac, temp_fac, knu_fac, 
+            prevstep = self.chain[walkidx, 0, :]
+            self.dustmass[walkidx, 0] = \
+                self._dmass_calc(prevstep, opz, bnu_fac, temp_fac, knu_fac,
                                  self.opthin, dl2)
             for stepidx in range(1, steps):
-                currstep = self.chain[walkidx,0,:]
+                currstep = self.chain[walkidx, 0, :]
                 if np.allclose(prevstep, currstep):
                     # Repeat, so avoid re-computation
                     self.dustmass[walkidx, stepidx] = \
-                        self.dustmass[walkidx, stepidx-1]
+                        self.dustmass[walkidx, stepidx - 1]
                 else:
                     self.dustmass[walkidx, stepidx] = \
                         self._dmass_calc(currstep, opz, bnu_fac,
-                                         temp_fac, knu_fac, 
+                                         temp_fac, knu_fac,
                                          self.opthin, dl2)
                     prevstep = currstep
 
         self._has_dustmass = True
-    
+
     def choice(self, nsamples=1, getpeaklambda=False, getlir=False,
                getdustmass=False):
         """ Get a random sample from the parameter chain, returning
@@ -825,7 +848,7 @@ class mbb_results(object):
         getlir : bool
           If true, adds lir sample, returning a tuple.  Peaklambda
           is added first
-        
+
         getdustmass : bool
           If true, adds a dustmass sample.  Peaklambda and lir are added
           first.
@@ -840,7 +863,8 @@ class mbb_results(object):
           nsamples is 1.
         """
 
-        if not self._fitset: return None
+        if not self._fitset:
+            return None
         if nsamples == 0:
             return None
 
@@ -891,7 +915,8 @@ class mbb_results(object):
 
                 rettup[0][idx, :] = self.chain[idx_walker, idx_step, :]
                 if getpeaklambda:
-                    rettup[peakidx][idx] = self.peaklambda[idx_walker, idx_step]
+                    rettup[peakidx][idx] = self.peaklambda[idx_walker,
+                                                           idx_step]
                 if getlir:
                     rettup[liridx][idx] = self.lir[idx_walker, idx_step]
                 if getdustmass:
@@ -909,7 +934,7 @@ class mbb_results(object):
           response function to integrate.
 
         maxidx : int
-          Maximum index in each walker to use. 
+          Maximum index in each walker to use.
 
         Returns
         -------
@@ -928,7 +953,7 @@ class mbb_results(object):
                                 "response functions available from original "
                                 "fit")
             if not spec in self._responsewheel:
-                errmsg  ="Do not have response function matching {:s}"
+                errmsg = "Do not have response function matching {:s}"
                 raise ValueError(errmsg.format(spec))
             resp = self._responsewheel[spec]
             doing_response = True
@@ -941,14 +966,14 @@ class mbb_results(object):
         # Do computation.  explicitly checking for repeats.
         shp = self.chain.shape[0:2]
         steps = shp[1]
-        if not maxidx is None:
-            if maxidx < steps: steps = maxidx
-        fpred = np.empty((shp[0],steps), dtype=np.float)
+        if not maxidx is None and maxidx < steps:
+            steps = maxidx
+        fpred = np.empty((shp[0], steps), dtype=np.float)
         for walkidx in range(shp[0]):
             # Do first step
-            prevstep = self.chain[walkidx,0,:]
+            prevstep = self.chain[walkidx, 0, :]
             sed = modified_blackbody(prevstep[0], prevstep[1], prevstep[2],
-                                     prevstep[3], prevstep[4], 
+                                     prevstep[3], prevstep[4],
                                      opthin=self.opthin,
                                      noalpha=self.noalpha)
             if doing_response:
@@ -957,14 +982,14 @@ class mbb_results(object):
                 fpred[walkidx, 0] = sed(wv)
 
             for stepidx in range(1, steps):
-                currstep = self.chain[walkidx,stepidx,:]
+                currstep = self.chain[walkidx, stepidx, :]
                 if np.allclose(prevstep, currstep):
                     # Repeat, so avoid re-computation
                     fpred[walkidx, stepidx] =\
-                        fpred[walkidx, stepidx-1]
+                        fpred[walkidx, stepidx - 1]
                 else:
-                    sed = modified_blackbody(currstep[0], currstep[1], 
-                                             currstep[2], currstep[3], 
+                    sed = modified_blackbody(currstep[0], currstep[1],
+                                             currstep[2], currstep[3],
                                              currstep[4], opthin=self.opthin,
                                              noalpha=self.noalpha)
                     if doing_response:
@@ -990,7 +1015,7 @@ class mbb_results(object):
           The percentile to use when computing the uncertainties.
 
         maxidx : int
-          Maximum index in each walker to use. 
+          Maximum index in each walker to use.
 
         lowlim : float
           Smallest value to allow in computation
@@ -1001,21 +1026,21 @@ class mbb_results(object):
         Returns
         -------
         res : ndarray
-          A 3 element array of the central value, upper uncertainty, 
+          A 3 element array of the central value, upper uncertainty,
           and lower uncertainty of the predicted flux in mJy.
-          If spec was a float, this is the sed flux at that value.  
-          If it was a string, it is the response predicted for that 
-          response function name. So, for example, if spec = 'SPIRE_250um' 
+          If spec was a float, this is the sed flux at that value.
+          If it was a string, it is the response predicted for that
+          response function name. So, for example, if spec = 'SPIRE_250um'
           it will be the predicted flux integrated through the Herschel-SPIRE
           250um filter function -- if that was available to the fit.
         """
 
-        if not self._fitset: return None
+        if not self._fitset:
+            return None
         pflux = self._predict_flux(spec, maxidx)
 
         return self._parcen_internal(pflux.flatten(), percentile,
                                      lowlim=lowlim, uplim=uplim)
-
 
     def writeToHDF5(self, filename):
         """ Serialize the results of the fit to an HDF5 file"""
@@ -1025,8 +1050,8 @@ class mbb_results(object):
         if not self._fitset:
             raise Exception("Fit not processed")
 
-        f = h5py.File(filename, 'w') # Overwrite if pre-existing
-        
+        f = h5py.File(filename, 'w')  # Overwrite if pre-existing
+
         # Write fit specification information as top level attributes
         if not self._z is None:
             f.attrs["z"] = self._z
@@ -1074,7 +1099,7 @@ class mbb_results(object):
         ga = f.create_group("Ancillary")
         ga.attrs["cosmo_type"] = self._cosmo_type
         if self._has_lumdist:
-            ga.attrs["lumdist"] = self._lumdist.value # in Mpc
+            ga.attrs["lumdist"] = self._lumdist.value  # in Mpc
         if self._has_lir:
             ga.attrs["LirMin"] = self._lir_min
             ga.attrs["LirMax"] = self._lir_max
@@ -1085,7 +1110,7 @@ class mbb_results(object):
             ga.create_dataset("Dustmass", data=self.dustmass)
         if self._has_peaklambda:
             ga.create_dataset("PeakLambda", data=self.peaklambda)
-        
+
         f.close()
 
     def readFromHDF5(self, filename):
@@ -1100,7 +1125,7 @@ class mbb_results(object):
             self._z = None
 
         self._noalpha = f.attrs["Noalpha"]
-        self._opthin = f.attrs["Opthin"] 
+        self._opthin = f.attrs["Opthin"]
         self._nwalkers = f.attrs["Nwalkers"]
         self._wavenorm = f.attrs["Wavenorm"]
         self._lowlim = f.attrs["Lowlim"]
@@ -1131,16 +1156,19 @@ class mbb_results(object):
             self._invcovmatrix = gd["InvCovmatrix"][...]
         else:
             self._has_covmatrix = False
-            if hasattr(self,"_covmatrix"): del self._covmatrix
-            if hasattr(self,"_invcovmatrix"): del self._invcovmatrix
+            if hasattr(self, "_covmatrix"):
+                del self._covmatrix
+            if hasattr(self, "_invcovmatrix"):
+                del self._invcovmatrix
 
         gc = f["Chain"]
         self.par_central_values = gc["ParamCentralValues"][...]
         self.chain = gc["Chain"][...]
         self.lnprobability = gc["LogLike"][...]
-        self._best_fit = (gc["BestFitParams"][...],gc["BestFitLogLike"][()],
+        self._best_fit = (gc["BestFitParams"][...],
+                          gc["BestFitLogLike"][()],
                           gc["BestFitIndex"][()])
-        
+
         ga = f["Ancillary"]
 
         if "cosmo_type" in ga:
@@ -1159,7 +1187,8 @@ class mbb_results(object):
             self._has_lir = False
             self._lir_min = None
             self._lir_max = None
-            if hasattr(self, 'lir'): del self.lir
+            if hasattr(self, 'lir'):
+                del self.lir
 
         if "Dustmass" in ga:
             self._kappa = ga.attrs["Kappa"]
@@ -1170,15 +1199,17 @@ class mbb_results(object):
             self._has_dustmass = False
             self._kappa = None
             self._kappa_wave = None
-            if hasattr(self, 'dustmass'): del self.dustmass
-            
+            if hasattr(self, 'dustmass'):
+                del self.dustmass
+
         if "PeakLambda" in ga:
             self._has_peaklambda = True
             self.peaklambda = ga["PeakLambda"][...]
         else:
             self._has_peaklambda = False
-            if hasattr(self, 'peaklambda'): del self.peaklambda
-        
+            if hasattr(self, 'peaklambda'):
+                del self.peaklambda
+
         self._fitset = True
 
         f.close()
@@ -1186,18 +1217,19 @@ class mbb_results(object):
     def __str__(self):
         """ String representation of results"""
 
-        if not self._fitset: 
+        if not self._fitset:
             return "<Uninitialized mbb_results object>"
 
-        idx = [0,1,4]
-        tag = ["T/(1+z)","beta","fnorm"]
-        units = ["[K]","","[mJy]"]
+        idx = [0, 1, 4]
+        tag = ["T/(1+z)", "beta", "fnorm"]
+        units = ["[K]", "", "[mJy]"]
         retstr = ""
-        
-        for i,tg, unit in zip(idx, tag, units):
+
+        for i, tg, unit in zip(idx, tag, units):
             retstr += "{:s}: ".format(tg)
             if self._fixed[i]:
-                retstr += "{:0.2f} (fixed)\n".format(self.chain[:,:,i].mean())
+                val = self.chain[:, :, i].mean()
+                retstr += "{:0.2f} (fixed)\n".format(val)
             else:
                 msg = "{:0.2f} +{:0.2f} -{:0.2f}"
                 retstr += msg.format(self.par_central_values[i][0],
@@ -1208,13 +1240,13 @@ class mbb_results(object):
                     retstr += " upper lim: {:0.2f}".format(self._uplim[i])
                 if self._has_gprior[i]:
                     msg = " prior: {:0.2f} {:0.2f}"
-                    retstr += msg.format(self._gprior_mean[i], 
+                    retstr += msg.format(self._gprior_mean[i],
                                          self._gprior_sigma[i])
                 retstr += ") {:s}\n".format(unit)
 
         if not self._opthin:
             if self._fixed[2]:
-                val = self.chain[:,:,2].mean()
+                val = self.chain[:, :, 2].mean()
                 retstr += "lambda0 (1+z): {:0.2f} (fixed) [um]\n".format(val)
             else:
                 msg = "lambda0 (1+z): {:0.2f} +{:0.2f} -{:0.2f}"
@@ -1226,7 +1258,7 @@ class mbb_results(object):
                     retstr += " upper lim: {:0.2f}".format(self._uplim[2])
                 if self._has_gprior[2]:
                     msg = " prior: {:0.2f} {:0.2f}"
-                    retstr += msg.format(self._gprior_mean[2], 
+                    retstr += msg.format(self._gprior_mean[2],
                                          self._gprior_sigma[2])
                 retstr += ") [um]\n"
         else:
@@ -1234,7 +1266,7 @@ class mbb_results(object):
 
         if not self._noalpha:
             if self._fixed[3]:
-                val = self.chain[:,:,3].mean()
+                val = self.chain[:, :, 3].mean()
                 retstr += "alpha: {:0.2f} (fixed)\n".format(val)
             else:
                 msg = "alpha: {:0.2f} +{:0.2f} -{:0.2f}"
@@ -1246,12 +1278,12 @@ class mbb_results(object):
                     retstr += " upper lim: {:0.2f}".format(self._uplim[3])
                 if self._has_gprior[3]:
                     msg = " prior: {:0.2f} {:0.2f}"
-                    retstr += msg.format(self._gprior_mean[3], 
+                    retstr += msg.format(self._gprior_mean[3],
                                          self._gprior_sigma[3])
                 retstr += ")\n"
         else:
             retstr += "Alpha not used\n"
-        
+
         # Lambda peak prior
         if self._has_uplim[5] or self._has_gprior[5]:
             retstr += "Lambda_peak prior"
@@ -1259,7 +1291,7 @@ class mbb_results(object):
                 retstr += " upper lim: {:0.2f}".format(self._uplim[5])
             if self._has_gprior[5]:
                 msg = " prior: {:0.2f} {:0.2f}"
-                retstr += msg.format(self._gprior_mean[5], 
+                retstr += msg.format(self._gprior_mean[5],
                                      self._gprior_sigma[5])
             retstr += "\n"
 
@@ -1269,27 +1301,30 @@ class mbb_results(object):
 
         if self.has_lir:
             args = self.lir_wavelength + tuple(self.lir_cen())
-            lirstr = "L_IR({:0.1f} to {:0.1f}um): {:0.2f} +{:0.2f} -{:0.2f} [10^12 L_sun]\n"
+            lirstr = "L_IR({:0.1f} to {:0.1f}um): {:0.2f} "\
+                     "+{:0.2f} -{:0.2f} [10^12 L_sun]\n"
             retstr += lirstr.format(*args)
 
         if self.has_dustmass:
-            args = (self.dust_kappa, self.dust_kappa_wavelength) +\
-                   tuple(self.dustmass_cen())
+            args = (self.dust_kappa, self.dust_kappa_wavelength) + \
+                tuple(self.dustmass_cen())
             duststr = "M_d(kappa={0:0.2f}, lam={1:0.1f}um): {2:0.2f} "\
                       "+{3:0.2f} -{4:0.2f} [10^8 M_sun]\n"
             retstr += duststr.format(*args)
 
         retstr += "Number of data points: {:d}\n".format(self._ndata)
-        retstr += "ChiSquare of best fit point: {:0.2f}".format(self.best_fit_chisq)
+        wstr = "ChiSquare of best fit point: {:0.2f}"
+        retstr += wstr.format(self.best_fit_chisq)
 
         return retstr
 
 ############################################################
 
-# The idea is to allow this to be multiprocessed
+
 class mbb_freqint(object):
     """ Does frequency integration"""
-    
+    # The idea is to allow this to be multiprocessed
+
     def __init__(self, redshift, lammin, lammax, opthin=False,
                  noalpha=False):
         """
@@ -1297,7 +1332,7 @@ class mbb_freqint(object):
         __________
         redshift : float
            Redshift of the object
-        
+
         lammin : float
            Minimum wavelength of frequency integral, in microns
 
@@ -1327,12 +1362,11 @@ class mbb_freqint(object):
             errmsg = "Invalid (non-positive) lammax: {:f}"
             raise Exception(errmsg.format(self._lammax))
         if self._lammin > self._lammax:
-            self._lammin, self._lammax = self._lammax, self._lammin            
+            self._lammin, self._lammax = self._lammax, self._lammin
 
         opz = 1.0 + self._redshift
         self._minwave_obs = self._lammin * opz
         self._maxwave_obs = self._lammax * opz
-        
 
     def __call__(self, params):
         """ Evaluates frequency integral.
