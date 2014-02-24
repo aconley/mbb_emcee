@@ -137,4 +137,5 @@ This depends on a number of python packages:
 * This code has been used in a variety of HerMES papers analyzing
   the SEDs of dusty, star-forming galaxies:
   * [Riechers et al. (2013)](http://dx.doi.org/10.1038/nature12050)
-  * [Fu et al. (2013)](http://arxiv.org/abs/1305.4930)
+  * [Fu et al. (2013)](http://dx.doi.org/10.1038/nature12184)
+  * [Dowell et al. (2014)(http://dx.doi.org/10.1088/0004-637X/780/1/75)
