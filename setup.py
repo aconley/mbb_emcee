@@ -19,7 +19,7 @@ setup(
     author="Alexander Conley",
     author_email="alexander.conley@colorado.edu",
     packages=["mbb_emcee"],
-    package_data={'mbb_emcee':['resources/*.txt']},
+    package_data={'mbb_emcee': ['resources/*.txt']},
     scripts=["mbb_emcee/run_mbb_emcee.py"],
     license="GPL",
     description="Modified blackbody fitting using MCMC",
@@ -31,9 +31,8 @@ setup(
         "Operating System :: OS Independent",
         "Programming Language :: Python",
     ],
-    requires = ['numpy (>1.7.0)', 'emcee (>1.0.0)', 'scipy (>0.8.0)', 
-                'astropy (>0.2.4)', 'cython (>0.11.0)', 'h5py (>2.0.0)'],
-    cmdclass = {'build_ext': build_ext},
-    ext_modules = ext_modules
+    requires=['numpy (>1.7.0)', 'emcee (>1.0.0)', 'scipy (>0.8.0)',
+              'astropy (>0.2.4)', 'cython (>0.11.0)', 'h5py (>2.0.0)'],
+    cmdclass={'build_ext': build_ext},
+    ext_modules=ext_modules
 )
-

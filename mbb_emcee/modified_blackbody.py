@@ -4,11 +4,19 @@ import scipy.optimize
 from scipy.special import lambertw
 
 from .utility import isiterable
-import fnu 
+import fnu
 
 """Modified blackbody and blackbody SEDs"""
 
 __all__ = ["modified_blackbody", "blackbody"]
+
+
+# Some constants
+c = 299792458e6  # in microns
+h = 6.6260693e-34  # J/s
+k = 1.3806505e-23  # J/K
+um_to_GHz = 299792458e-3
+
 
 class blackbody(object):
     """A class representing a Blackbody"""
@@ -20,7 +28,7 @@ class blackbody(object):
         -----------
         T : float
           Temperature/(1+z) in K
-        
+
         fnorm : float
           Normalization flux, in mJy
 
@@ -33,11 +41,8 @@ class blackbody(object):
         self._wavenorm = float(wavenorm)
 
         # Some constants -- eventually, replace these with
-        # astropy.constants, but that is in development, so hardwire 
+        # astropy.constants, but that is in development, so hardwire
         # for now
-        c = 299792458e6 #in microns
-        h = 6.6260693e-34 #J/s
-        k = 1.3806505e-23 #J/K
         self._hcokt = h * c / (k * self._T)
         self._xnorm = self._hcokt / self._wavenorm
         self._normfac = self._fnorm * math.expm1(self._xnorm) / \
@@ -86,13 +91,10 @@ class blackbody(object):
         else:
             frequency = numpy.asanyarray(freq, dtype=numpy.float)
 
-        # Some constants
-        h = 6.6260693e-34 #J/s
-        k = 1.3806505e-23 #J/K
         hokt = h / (k * self._T)
 
         # Convert wavelengths to x = h nu / k T
-        x = hokt * 1e9 * frequency  #1e9 to convert to Hz from GHz
+        x = hokt * 1e9 * frequency  # 1e9 to convert to Hz from GHz
         return self._normfac * x**3.0 / numpy.expm1(x)
 
     def __call__(self, wave):
@@ -108,13 +110,14 @@ class blackbody(object):
         fnu : ndarray, or float if input scalar
           The flux density in mJy
         """
-        c = 299792458e-3 #The microns to GHz conversion
+
         wviter = isiterable(wave)
         if wviter:
             wave = numpy.asanyarray(wave, dtype=numpy.float)
             return self.f_nu(c / wave)
         else:
-            return self.f_nu(c / float(wave))
+            return self.f_nu(um_to_GHz / float(wave))
+
 
 def alpha_merge_eqn(x, alpha, beta, x0, opthin=False):
     """Equation we need the root for to merge power law to modified
@@ -138,24 +141,24 @@ def alpha_merge_eqn(x, alpha, beta, x0, opthin=False):
       Assume optically thin case
     """
 
-    try :
+    try:
         # This can overflow badly
         xox0beta = (x / x0)**beta
         bterm = xox0beta / math.expm1(xox0beta)
     except OverflowError:
         # If xox0beta is very large, then the bterm is zero
         bterm = 0.0
-    return x - (1.0 - math.exp(-x)) * (3.0 + alpha + beta * bterm)  
+    return x - (1.0 - math.exp(-x)) * (3.0 + alpha + beta * bterm)
 
 
 class modified_blackbody(object):
     """A class representing a modified greybody
 
     The form for the modified blackbody is
-    
+
     .. math::
 
-      f_{\\nu} \\propto \\left(1 - \\exp\\left[ - \\left(\\nu / 
+      f_{\\nu} \\propto \\left(1 - \\exp\\left[ - \\left(\\nu /
       \\nu_0\\right)^{\\beta} B_{\\nu}\\left( \\nu ; T \\right)
 
     where :math:`B_{\\nu}` is the Planck blackbody function in frequency
@@ -170,12 +173,12 @@ class modified_blackbody(object):
         -----------
         T : float
           Temperature/(1+z) in K
-        
+
         beta : float
           Extinction slope
 
         lambda0 : float
-          Wavelength where emission becomes optically thick * (1+z), in 
+          Wavelength where emission becomes optically thick * (1+z), in
           microns
 
         alpha : float
@@ -212,7 +215,7 @@ class modified_blackbody(object):
         else:
             self._opthin = False
             self._lambda0 = float(lambda0)
-            
+
         if self._hasalpha and alpha <= 0.0:
             errmsg = "alpha must be positive.  You gave: {:.5g}"
             raise ValueError(errmsg.format(self._alpha))
@@ -222,9 +225,6 @@ class modified_blackbody(object):
 
         # Some constants -- eventually, replace these with
         # astropy.constants, but that is in development, so hardwire for now
-        c = 299792458e6 #in microns
-        h = 6.6260693e-34 #J/s
-        k = 1.3806505e-23 #J/K
         self._hcokt = h * c / (k * self._T)
 
         # Convert wavelengths to x = h nu / k T
@@ -253,30 +253,32 @@ class modified_blackbody(object):
                 a = 3.0 + self._alpha + self._beta
                 self._xmerge = a + lambertw(-a * math.exp(-a)).real
 
-                # Get merge constant -- note this is -before- flux normalization
-                # to allow for the case where wavenorm is on the power law part
-                self._kappa = self._xmerge**(3.0 + self._alpha + self._beta) / \
+                # Get merge constant -- note this is -before- flux
+                # normalization to allow for the case where wavenorm is
+                # on the power law part
+                self._kappa = self._xmerge**(3.0 + self._alpha +
+                                             self._beta) / \
                     math.expm1(self._xmerge)
 
                 # Compute normalization constant
-                if self._xnorm > self._xmerge :
+                if self._xnorm > self._xmerge:
                     self._normfac = self._fnorm * self._xnorm**self._alpha / \
                         self._kappa
-                else :
+                else:
                     self._normfac = self._fnorm * math.expm1(self._xnorm) / \
                         self._xnorm**(3.0 + self._beta)
-                
+
         else:
             #Optically thick case
             if not self._hasalpha:
                 self._normfac = - self._fnorm * math.expm1(self._xnorm) / \
-                    (math.expm1(-(self._xnorm / self._x0)**self._beta) * \
-                         self._xnorm**3)
-            else :
+                    (math.expm1(-(self._xnorm / self._x0)**self._beta) *
+                     self._xnorm**3)
+            else:
                 # This is harder, and does not have a special function
                 # solution.  Hence, we have to do this numerically.
-                # The equation we need to find the root for is given by 
-                # alpha_merge_eqn.  
+                # The equation we need to find the root for is given by
+                # alpha_merge_eqn.
 
                 # First, we bracket.  For positive alpha, beta
                 # we expect this to be negative for small a and positive
@@ -287,13 +289,14 @@ class modified_blackbody(object):
                 iter = 0
                 while aval >= 0.0:
                     a /= 2.0
-                    aval = alpha_merge_eqn(a, self._alpha, self._beta, self._x0)
+                    aval = alpha_merge_eqn(a, self._alpha,
+                                           self._beta, self._x0)
                     if iter > maxiters:
                         errmsg = "Couldn't bracket low alpha merge point for "\
-                            "T: {:f} beta: {:f} lambda0: {:f} alpha {:f}, "\
-                            "last a: {:f} value: {:f}"
-                        raise ValueError(errmsg.format(self._T, self._beta, 
-                                                       self._lambda0, 
+                                 "T: {:f} beta: {:f} lambda0: {:f} "\
+                                 "alpha {:f}, last a: {:f} value: {:f}"
+                        raise ValueError(errmsg.format(self._T, self._beta,
+                                                       self._lambda0,
                                                        self._alpha, a, aval))
                     iter += 1
 
@@ -302,16 +305,17 @@ class modified_blackbody(object):
                 iter = 0
                 while bval <= 0.0:
                     b *= 2.0
-                    bval = alpha_merge_eqn(b, self._alpha, self._beta, self._x0)
+                    bval = alpha_merge_eqn(b, self._alpha, self._beta,
+                                           self._x0)
                     if iter > maxiters:
-                        errmsg = "Couldn't bracket high alpha merge point for "\
-                            "T: {:f} beta: {:f} lambda0: {:f} alpha {:f}, "\
-                            "last a: {:f} value: {:f}"
-                        raise ValueError(errmsg.format(self._T, self._beta, 
-                                                       self._lambda0, 
+                        errmsg = "Couldn't bracket high alpha merge point "\
+                                 "for T: {:f} beta: {:f} lambda0: {:f} "\
+                                 "alpha {:f}, last a: {:f} value: {:f}"
+                        raise ValueError(errmsg.format(self._T, self._beta,
+                                                       self._lambda0,
                                                        self._alpha, a, aval))
                     iter += 1
-                    
+
                 # Now find root
                 args = (self._alpha, self._beta, self._x0)
                 self._xmerge = scipy.optimize.brentq(alpha_merge_eqn, a, b,
@@ -324,13 +328,13 @@ class modified_blackbody(object):
                     math.expm1(self._xmerge)
 
                 #Normalization factor
-                if self._xnorm > self._xmerge :
+                if self._xnorm > self._xmerge:
                     self._normfac = self._fnorm * self._xnorm**self._alpha / \
                         self._kappa
-                else :
-                    self._normfac = - self._fnorm * math.expm1(self._xnorm) / \
-                        (self._xnorm**3 * \
-                             math.expm1(-(self._xnorm / self._x0)**self._beta))
+                else:
+                    expmfac = math.expm1(-(self._xnorm / self._x0)**self._beta)
+                    self._normfac = -self._fnorm * math.expm1(self._xnorm) / \
+                        (self._xnorm**3 * expmfac)
 
     @property
     def T(self):
@@ -341,19 +345,21 @@ class modified_blackbody(object):
     def beta(self):
         """ Get Beta"""
         return self._beta
-    
+
     @property
     def lambda0(self):
         """ Get lambda_0 (1+z) in microns"""
-        if self._opthin: return None
+        if self._opthin:
+            return None
         return self._lambda0
 
     @property
     def alpha(self):
         """ Get alpha"""
-        if not self._hasalpha: return None
+        if not self._hasalpha:
+            return None
         return self._alpha
-    
+
     @property
     def fnorm(self):
         """ Get normalization flux at wavenorm in mJy"""
@@ -406,7 +412,6 @@ class modified_blackbody(object):
                 return retstr.format(self._T, self._beta, self.lambda0,
                                      self._fnorm, self._wavenorm)
 
-
     def __str__(self):
         if self._hasalpha:
             if self._opthin:
@@ -431,7 +436,7 @@ class modified_blackbody(object):
                 retstr = "modified_blackbody(T: {:.2g} beta: {:.2g} " + \
                     "lambda0: {:.2g} fnorm: {:.2g}  wavenorm: {:.2g})"
                 return retstr.format(self._T, self._beta, self.lambda0,
-                                     self._fnorm, self._wavenorm)  
+                                     self._fnorm, self._wavenorm)
 
     def f_nu(self, freq):
         """Evaluate modifed blackbody at specified frequencies.
@@ -453,13 +458,10 @@ class modified_blackbody(object):
         else:
             frequency = numpy.asanyarray(freq, dtype=numpy.float)
 
-        # Some constants
-        h = 6.6260693e-34 #J/s
-        k = 1.3806505e-23 #J/K
         hokt = h / (k * self._T)
 
         # Convert wavelengths to x = h nu / k T
-        x = hokt * 1e9 * frequency  #1e9 to convert to Hz from GHz
+        x = hokt * 1e9 * frequency  # 1e9 to convert to Hz from GHz
 
         # Two cases -- optically thin and not.
         #  Each has two sub-cases -- with power law merge and without
@@ -478,12 +480,12 @@ class modified_blackbody(object):
                 retval = - self._normfac * \
                     numpy.expm1(-(x / self._x0)**self._beta) * x**3 / \
                     numpy.expm1(x)
-            else :
+            else:
                 retval = numpy.zeros_like(frequency)
                 ispower = x > self._xmerge
                 retval[ispower] = self._kappa * x[ispower]**(-self._alpha)
                 retval[~ispower] = \
-                    - numpy.expm1( - (x[~ispower]/self._x0)**self._beta) * \
+                    - numpy.expm1(-(x[~ispower]/self._x0)**self._beta) * \
                     x[~ispower]**3/numpy.expm1(x[~ispower])
                 retval *= self._normfac
         return retval
@@ -523,10 +525,10 @@ class modified_blackbody(object):
                 retval = fnu.fnueval_thick_noalpha(frequency, self._T,
                                                    self._beta, self._x0,
                                                    self._normfac)
-            else :
+            else:
                 retval = fnu.fnueval_thick_walpha(frequency, self._T,
                                                   self._beta, self._x0,
-                                                  self._alpha, self._normfac, 
+                                                  self._alpha, self._normfac,
                                                   self._xmerge, self._kappa)
         return retval
 
@@ -543,13 +545,13 @@ class modified_blackbody(object):
         fnu : ndarray, or float if input scalar
           The flux density in mJy
         """
-        
-        c = 299792458e-3 #The microns to GHz conversion
+
         wviter = isiterable(wave)
         if wviter:
-            return self._f_nu_c(c/numpy.asanyarray(wave, dtype=numpy.float64))
+            return self._f_nu_c(um_to_GHz /
+                                numpy.asanyarray(wave, dtype=numpy.float64))
         else:
-            return self.f_nu(c / float(wave))
+            return self.f_nu(um_to_GHz / float(wave))
 
     def _snudev(self, x):
         """ Evaluates derivative (modulo normalization) of S_nu at x
@@ -558,7 +560,7 @@ class modified_blackbody(object):
 
         Ignores alpha side, since that should be rising -- so the peak
         should lie at lower frequency than the merge to the alpha law"""
-        
+
         if self._opthin:
             efac = math.expm1(x)
             return x**(2.0 + self._beta) * (3.0 + self._beta) / efac - \
@@ -569,10 +571,9 @@ class modified_blackbody(object):
             try:
                 xx0b = xx0**self._beta
                 ebfac = - math.expm1(-xx0b)
-                return 3 * x**2 * ebfac / efac -\
-                    math.exp(x) * x**3 * ebfac / efac**2 +\
-                    self._beta * x**3 * math.exp(-xx0b) * xx0b / \
-                    (x * efac)
+                return 3 * x**2 * ebfac / efac - \
+                    math.exp(x) * x**3 * ebfac / efac**2 + \
+                    self._beta * x**3 * math.exp(-xx0b) * xx0b / (x * efac)
             except OverflowError:
                 # (x/x0)**beta is too large, which simplifies the expression
                 return 3 * x**2 / efac - math.exp(x) * x**3 / efac**2
@@ -585,7 +586,7 @@ class modified_blackbody(object):
         wave : float
          The wavelength of the maximum in microns
         """
-        
+
         # Note that the alpha portion is ignored, since we
         # require alpha to be positive.  That means that
         # the power law part should be rising where it joins
@@ -595,10 +596,7 @@ class modified_blackbody(object):
         from scipy.optimize import brentq
 
         # Start with an expression for the maximum of a normal
-        # blackbody.  We work in x = h nu / k T 
-        c = 299792458e6 #in microns
-        h = 6.6260693e-34 #J/s
-        k = 1.3806505e-23 #J/K
+        # blackbody.  We work in x = h nu / k T
         xmax_bb = 2.82144
         numax_bb = xmax_bb * k * self._T / h
         if (self._opthin and self._beta == 0):
@@ -630,7 +628,7 @@ class modified_blackbody(object):
             b *= 2.0
             bval = self._snudev(b)
             iter += 1
-        
+
         # Now find the actual root
         xmax = brentq(self._snudev, a, b, disp=True)
 
@@ -654,7 +652,7 @@ class modified_blackbody(object):
         fint : float
           The integral in erg/s/cm^2
         """
-        
+
         from scipy.integrate import quad
 
         minwave = float(minwave)
@@ -664,15 +662,13 @@ class modified_blackbody(object):
             raise ValueError("Minimum wavelength must be > 0.0")
         if minwave > maxwave:
             minwave, maxwave = maxwave, minwave
-        
+
         # Tricky thing -- we are integrating over frequency (in GHz),
         # not wavelength
-        c = 299792458e-3
-        minfreq = c / maxwave
-        maxfreq = c / minwave
+        minfreq = um_to_GHz / maxwave
+        maxfreq = um_to_GHz / minwave
 
         fint = quad(self.f_nu, minfreq, maxfreq)[0]
 
         # Integral comes back in mJy-GHz, convert to erg/s/cm^2
         return 1e-17 * fint
-        
