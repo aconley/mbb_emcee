@@ -536,38 +536,53 @@ class mbb_results(object):
         return self._parcen_internal(self.peaklambda.flatten(), percentile,
                                      lowlim=lowlim, uplim=uplim)
 
-    def compute_peaklambda(self):
-        """ Compute the observer frame wavelength of peak emission
-        in microns from chain"""
+    def _map_chain(self, func, maxidx=None, **kwargs):
+        """ Computes func over all values in the chains.
+
+        func : function
+          Function to apply
+
+        maxidx : int
+          Maximum index in each walker to use.  If None, use all
+
+        This avoid recomputing the value when a step is equal to its
+        previous value (unlike, say, map).
+        """
 
         shp = self.chain.shape[0:2]
-        self.peaklambda = np.empty(shp, dtype=np.float)
+        steps = shp[1]
+        if not maxidx is None and maxidx < shp[1]:
+            shp[1] = maxidx
+
+        retvar = np.empty(shp, dtype=np.float)
         for walkidx in range(shp[0]):
             # Do first step
             prevstep = self.chain[walkidx, 0, :]
-            sed = modified_blackbody(prevstep[0], prevstep[1], prevstep[2],
-                                     prevstep[3], prevstep[4],
-                                     opthin=self.opthin,
-                                     noalpha=self.noalpha)
-            self.peaklambda[walkidx, 0] = sed.max_wave()
+            retvar[walkidx, 0] = func(prevstep, **kwargs)
 
             #Now other steps
             for stepidx in range(1, shp[1]):
                 currstep = self.chain[walkidx, stepidx, :]
                 if np.allclose(prevstep, currstep):
                     # Repeat, so avoid re-computation
-                    self.peaklambda[walkidx, stepidx] = \
-                        self.peaklambda[walkidx, stepidx - 1]
+                    retvar[walkidx, stepidx] = retvar[walkidx, stepidx - 1]
                 else:
-                    sed = modified_blackbody(currstep[0], currstep[1],
-                                             currstep[2], currstep[3],
-                                             currstep[4],
-                                             opthin=self.opthin,
-                                             noalpha=self.noalpha)
-                    self.peaklambda[walkidx, stepidx] = \
-                        sed.max_wave()
+                    retvar[walkidx, stepidx] = func(currstep, **kwargs)
                     prevstep = currstep
 
+        return retvar
+
+    def compute_peaklambda(self):
+        """ Compute the observer frame wavelength of peak emission
+        in microns from chain"""
+
+        def peaklambda_inner(step, opthin=False, noalpha=False):
+            sed = modified_blackbody(step[0], step[1], step[2], step[3],
+                                     step[4], opthin=opthin,
+                                     noalpha=noalpha)
+            return sed.max_wave()
+
+        self.peaklambda = self._map_chain(peaklambda_inner)
         self._has_peaklambda = True
 
     @property
@@ -636,7 +651,6 @@ class mbb_results(object):
 
         if not self._fitset:
             raise Exception("Fit results not loaded")
-
         if self._z is None:
             raise Exception("Redshift must be set to compute L_IR")
 
@@ -661,30 +675,7 @@ class mbb_results(object):
                                  opthin=self.opthin,
                                  noalpha=self.noalpha)
 
-        # Now we compute L_IR for every step taken.
-        # Explicitly check for repeats
-        shp = self.chain.shape[0:2]
-        steps = shp[1]
-        if not maxidx is None and maxidx < steps:
-            steps = maxidx
-        self.lir = np.empty((shp[0], steps), dtype=np.float)
-        for walkidx in range(shp[0]):
-            # Do first step
-            prevstep = self.chain[walkidx, 0, :]
-            self.lir[walkidx, 0] = \
-                lirprefac * integrator(prevstep)
-            for stepidx in range(1, steps):
-                currstep = self.chain[walkidx, stepidx, :]
-                if np.allclose(prevstep, currstep):
-                    # Repeat, so avoid re-computation
-                    self.lir[walkidx, stepidx] = \
-                        self.lir[walkidx, stepidx-1]
-                else:
-                    # New step
-                    self.lir[walkidx, stepidx] = \
-                        lirprefac * integrator(currstep)
-                    prevstep = currstep
-
+        self.lir = lirprefac * self._map_chain(integrator, maxidx=maxidx)
         self._has_lir = True
 
     @property
@@ -806,30 +797,12 @@ class mbb_results(object):
 
         msolar8 = 1.97792e41  # mass of the sun*10^8 in g
 
-        shp = self.chain.shape[0:2]
-        steps = shp[1]
-        if not maxidx is None and maxidx < steps:
-            steps = maxidx
-        self.dustmass = np.empty((shp[0], steps), dtype=np.float)
-        for walkidx in range(shp[0]):
-            # Do first step
-            prevstep = self.chain[walkidx, 0, :]
-            self.dustmass[walkidx, 0] = \
-                self._dmass_calc(prevstep, opz, bnu_fac, temp_fac, knu_fac,
-                                 self.opthin, dl2)
-            for stepidx in range(1, steps):
-                currstep = self.chain[walkidx, 0, :]
-                if np.allclose(prevstep, currstep):
-                    # Repeat, so avoid re-computation
-                    self.dustmass[walkidx, stepidx] = \
-                        self.dustmass[walkidx, stepidx - 1]
-                else:
-                    self.dustmass[walkidx, stepidx] = \
-                        self._dmass_calc(currstep, opz, bnu_fac,
-                                         temp_fac, knu_fac,
-                                         self.opthin, dl2)
-                    prevstep = currstep
+        # Use closure
+        def dmass_inner(step):
+            return self._dmass_calc(step, opz, bnu_fac, temp_fac, knu_fac,
+                                    self.opthin, dl2)
 
+        self.dustmass = self._map_chain(dmass_inner, maxidx=maxidx)
         self._has_dustmass = True
 
     def choice(self, nsamples=1, getpeaklambda=False, getlir=False,
@@ -963,43 +936,17 @@ class mbb_results(object):
                 raise ValueError("Invalid wavelength {:f}".format(wv))
             doing_response = False
 
-        # Do computation.  explicitly checking for repeats.
-        shp = self.chain.shape[0:2]
-        steps = shp[1]
-        if not maxidx is None and maxidx < steps:
-            steps = maxidx
-        fpred = np.empty((shp[0], steps), dtype=np.float)
-        for walkidx in range(shp[0]):
-            # Do first step
-            prevstep = self.chain[walkidx, 0, :]
-            sed = modified_blackbody(prevstep[0], prevstep[1], prevstep[2],
-                                     prevstep[3], prevstep[4],
+        def predflux_inner(step):
+            sed = modified_blackbody(step[0], step[1], step[2],
+                                     step[3], step[4],
                                      opthin=self.opthin,
                                      noalpha=self.noalpha)
             if doing_response:
-                fpred[walkidx, 0] = resp(sed)
+                return resp(sed)
             else:
-                fpred[walkidx, 0] = sed(wv)
+                return sed(wv)
 
-            for stepidx in range(1, steps):
-                currstep = self.chain[walkidx, stepidx, :]
-                if np.allclose(prevstep, currstep):
-                    # Repeat, so avoid re-computation
-                    fpred[walkidx, stepidx] =\
-                        fpred[walkidx, stepidx - 1]
-                else:
-                    sed = modified_blackbody(currstep[0], currstep[1],
-                                             currstep[2], currstep[3],
-                                             currstep[4], opthin=self.opthin,
-                                             noalpha=self.noalpha)
-                    if doing_response:
-                        fpred[walkidx, stepidx] = resp(sed)
-                    else:
-                        fpred[walkidx, stepidx] = sed(wv)
-
-                    prevstep = currstep
-
-        return fpred
+        return self._map_chain(predflux_inner, maxidx=maxidx)
 
     def predflux_cen(self, spec, percentile=68.3, maxidx=None,
                      lowlim=None, uplim=None):
