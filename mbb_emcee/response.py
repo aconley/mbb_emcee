@@ -19,6 +19,7 @@ except:
 
 special_types = ["delta", "box", "gauss", "alma"]
 
+
 def response_bb(freq, temperature):
     """Evaluates blackbody fnu at specified frequency and temperature
 
@@ -38,11 +39,12 @@ def response_bb(freq, temperature):
 
     # Some constants -- eventually, replace these with
     # astropy.constants, but that is in development, so hardwire for now
-    h = 6.6260693e-34 #J/s
-    k = 1.3806505e-23 #J/K
-    hokt = 1e9 * h / (k * float(temperature)) #The 1e9 is GHz -> Hz
-    
+    h = 6.6260693e-34  # J/s
+    k = 1.3806505e-23  # J/K
+    hokt = 1e9 * h / (k * float(temperature))  # The 1e9 is GHz -> Hz
+
     return freq**3 / numpy.expm1(hokt * freq)
+
 
 class response(object):
     """ A class representing the response of an instrument to an observation.
@@ -62,7 +64,7 @@ class response(object):
         self._data_read = False
 
     def setup(self, inputspec, xtype='wave', xunits='microns',
-              senstype='energy', normtype='power', xnorm=250.0, 
+              senstype='energy', normtype='power', xnorm=250.0,
               normparam=-1.0, dir=None):
         """ Set up the response function, usually by reading an input file
 
@@ -70,16 +72,17 @@ class response(object):
         ----------
         inputspec : string
           Name of input file.  Must be a text file.  If this has the special
-          values delta_?, box_?, or gauss_?, then rather than reading from a 
+          values delta_?, box_?, or gauss_?, then rather than reading from a
           file the passband is created internally.
 
         xtype : string
-          Type of input x variable.  lambda for wavelengths, freq for frequency.
+          Type of input x variable.  lambda for wavelengths, freq for
+          frequency.
 
         xunits : string
-          Units of input x variable.  microns, angstroms, or meters for 
+          Units of input x variable.  microns, angstroms, or meters for
           wavelength, hz, mhz, ghz, thz for frequency.
-        
+
         normtype : string
           Type of normalization.  power for power-law, bb for blackbody, flat
           for flat fnu, none for no normalization, etc.
@@ -91,25 +94,25 @@ class response(object):
            X value of normalization, same units as input x value.
 
         normparam : float
-          Normalizatin parameter -- power low exponent for power-law,
+          Normalization parameter -- power low exponent for power-law,
           temperature for blackbody
-    
+
         dir : string
           Directory to look for inputspec in.  Defaults to current directory.
 
         Notes
         -----
-        If inputspec is delta_val, then the filter function is assumed to be a 
-        delta function at value.  normtype, etc. is ignored.  For example, if 
-        xunit is microns, then delta_880 sets up a delta function at 880um.  
+        If inputspec is delta_val, then the filter function is assumed to be a
+        delta function at value.  normtype, etc. is ignored.  For example, if
+        xunit is microns, then delta_880 sets up a delta function at 880um.
         If xunit were GHz, then it would be a delta function at 880GHz.
 
-        If inputspec is box_val1_val2, then the filter function is a box with 
-        11 points centered on val1 and with a width of val2 (in the units of 
+        If inputspec is box_val1_val2, then the filter function is a box with
+        11 points centered on val1 and with a width of val2 (in the units of
         xunits)
 
-        If inputspec is gauss_val1_val2, then the filter function is a 
-        Gaussian centered on val1 with a FWHM of val2.  It is sampled every 
+        If inputspec is gauss_val1_val2, then the filter function is a
+        Gaussian centered on val1 with a FWHM of val2.  It is sampled every
         FWHM/7 steps out to 3*FWHM in each direction.
 
         So don't name your input files delta_?, gauss_?, or box_?
@@ -141,15 +144,15 @@ class response(object):
                 return
             elif bs == "box":
                 if len(spl) < 3:
-                    errstr = "box car needs 2 params in {:s}".format(inputspec)
-                    raise ValueError(errstr)
-                xvals, self._resp = self._setup_box(float(spl[1]), 
+                    errstr = "box car needs 2 params in {:s}"
+                    raise ValueError(errstr.format(inputspec))
+                xvals, self._resp = self._setup_box(float(spl[1]),
                                                     float(spl[2]))
             elif bs == "gauss":
                 if len(spl) < 3:
-                    errstr = "gaussian needs 2 params in {:s}".format(inputspec)
-                    raise ValueError(errstr)
-                xvals, self._resp = self._setup_gauss(float(spl[1]), 
+                    errstr = "gaussian needs 2 params in {:s}"
+                    raise ValueError(errstr.format(inputspec))
+                xvals, self._resp = self._setup_gauss(float(spl[1]),
                                                       float(spl[2]))
 
             elif bs == "alma":
@@ -159,7 +162,7 @@ class response(object):
                 xvals, self._resp = self._setup_alma(float(spl[1]),
                                                      xtyp, xun)
             else:
-                #A real file -- read it!
+                # A real file -- read it!
                 if dir is None:
                     infile = inputspec
                 else:
@@ -195,7 +198,7 @@ class response(object):
             else:
                 errmsg = "Unrecognized wavelength unit {:s}".format(xun)
                 raise ValueError(errmsg)
-            self._freq = 299792458e-3 / self._wave #In GHz
+            self._freq = 299792458e-3 / self._wave  # In GHz
             self._normfreq = 299792458e-3 / self._normwave
         elif xtyp == 'freq':
             # Change to GHz
@@ -215,7 +218,7 @@ class response(object):
                 errmsg = "Unrecognized frequency unit {:s}".format(xun)
                 raise ValueError(errmsg)
 
-            self._wave = 299792458e-3 / self._freq #Microns
+            self._wave = 299792458e-3 / self._freq  # Microns
             self._normwave = 299792458e-3 / self._normfreq
 
         # Sort into ascending wavelength order for simplicity
@@ -281,10 +284,11 @@ class response(object):
                 # Rather more complicated
                 self._normparam = float(normparam)
                 if self._normparam <= 0.0:
-                    errmsg = "Invalid (non-positive) blackbody temperature {:f}"
+                    errmsg = "Invalid (non-positive) blackbody "\
+                             "temperature {:f}"
                     raise ValueError(errmsg.format(self._normparam))
                 # Blackbody curve, normalized at normfreq
-                sed = response_bb(self._freq, self._normparam) /\
+                sed = response_bb(self._freq, self._normparam) / \
                     response_bb(self._normfreq, self._normparam)
             else:
                 errmsg = "Unknown normalization type {:s}"
@@ -340,7 +344,7 @@ class response(object):
         self._normparam = None
         self._normfac = 1.0
         self._sens_energy = True
-        
+
     def _setup_box(self, cent, width):
         npoints = 11
         xvals = numpy.linspace(cent - 0.5 * width,
@@ -352,9 +356,9 @@ class response(object):
     def _setup_gauss(self, cent, fwhm):
         minval = cent - 3.0*fwhm
         maxval = cent + 3.0*fwhm
-        npoints = 43 # (FWHM/7)
+        npoints = 43  # (FWHM/7)
         sig = fwhm / math.sqrt(8 * math.log(2))
-        xvals = numpy.linspace(cent - 3.0*fwhm, 
+        xvals = numpy.linspace(cent - 3.0*fwhm,
                                cent + 3.0*fwhm,
                                npoints)
         resp = numpy.exp(-0.5 * ((xvals - cent) / sig)**2)
@@ -389,7 +393,7 @@ class response(object):
         else:
             raise ValueError("Unknown unit type {:s}".format(xtype))
 
-        # Identify band: bands 3, 4, 6, 7, 8; don't support band 9 since 
+        # Identify band: bands 3, 4, 6, 7, 8; don't support band 9 since
         # it's more complex (DSB vs. 2SB).  Bands 1, 2, 5, 10 not implemented
         if_low = numpy.array([92.0, 125, 221, 283, 385])
         if_high = numpy.array([108.0, 163, 265, 365, 500])
@@ -401,12 +405,12 @@ class response(object):
         xvals0 = numpy.linspace(cen_freq - if_range_bot[wband] - 3.75,
                                 cen_freq - if_range_bot[wband], npoints)
         xvals1 = numpy.linspace(cen_freq - if_range_bot[wband] + 0.0001,
-                                cen_freq + if_range_bot[wband] - 0.0001, 
+                                cen_freq + if_range_bot[wband] - 0.0001,
                                 npoints0)
         xvals2 = numpy.linspace(cen_freq + if_range_bot[wband],
                                 cen_freq + if_range_bot[wband] + 3.75, npoints)
         xvals = numpy.concatenate((xvals0, xvals1, xvals2))
-        resp = numpy.concatenate((numpy.ones(npoints), numpy.zeros(npoints0), 
+        resp = numpy.concatenate((numpy.ones(npoints), numpy.zeros(npoints0),
                                   numpy.ones(npoints)))
         return xvals, resp
 
@@ -461,7 +465,6 @@ class response(object):
             return None
         return -1.0 * self._normfac
 
-
     def __call__(self, fnufunc, freq=False):
         """ Gets the instrumental response for a SED.
 
@@ -479,7 +482,7 @@ class response(object):
         resp : float
           Instrument response, including pipeline normalization convention.
         """
-        
+
         if not self._data_read:
             raise Exception("Data not read yet, can't get response")
 
@@ -522,7 +525,7 @@ class response(object):
         if not self._isdelta:
             handle.create_dataset("Dnu", data=self._dnu)
             handle.create_dataset("Sedmult", data=self._sedmult)
-            
+
     def readFromHDF5(self, handle):
         """ Reads the response to an HDF5 handle (file, group)"""
 
@@ -535,8 +538,8 @@ class response(object):
             self._normparam = handle.attrs["NormParam"]
         else:
             self._normparam = None
-        self._normfac = handle.attrs["NormFac"] 
-        self._sens_energy = handle.attrs["SensEnergy"] 
+        self._normfac = handle.attrs["NormFac"]
+        self._sens_energy = handle.attrs["SensEnergy"]
         self._effective_freq = handle.attrs["EffectiveFreq"]
         self._effective_wave = handle.attrs["EffectiveWave"]
         self._nresp = handle.attrs["NResp"]
@@ -555,14 +558,14 @@ class response(object):
                 del self._sedmult
         self._data_read = True
 
-
     def __str__(self):
         val = "{0:s} lambda_eff: {1:0.1f} [um]"
         return val.format(self._name, self._effective_wave)
 
+
 class response_set(object):
     """ A set of instrument responses."""
-    
+
     def __init__(self, inputfile=None, dir=None):
         """ Initialize response set.
 
@@ -577,8 +580,8 @@ class response_set(object):
 
         self._responses = {}
         # Note this loads a default if inputfile is None
-        self.read(inputfile=inputfile, dir=dir) 
-    
+        self.read(inputfile=inputfile, dir=dir)
+
     def read(self, inputfile=None, dir=None):
         """ Read in responses
 
@@ -590,16 +593,16 @@ class response_set(object):
         dir: string
           Directory to look for responses in; defaults to current directory,
           but is ignored if using default inputfile
- 
+
         Notes
         -----
           This will clear out all previously loaded information.
         """
 
         import astropy.io.ascii
-        
+
         if inputfile is None:
-            infile = resource_filename(__name__, 
+            infile = resource_filename(__name__,
                                        'resources/mbb_filterwheel.txt')
             indir = resource_filename(__name__, 'resources/')
         elif not isinstance(inputfile, basestring):
@@ -613,9 +616,9 @@ class response_set(object):
                     raise TypeError("dir must be string-like")
                 infile = os.path.join(dir, inputfile)
                 indir = dir
-        
+
         data = astropy.io.ascii.read(infile, comment='^#')
-        if len(data) == 0 :
+        if len(data) == 0:
             raise IOError("No data read from {:s}".format(inputfile))
 
         # Clear old responses
@@ -623,8 +626,8 @@ class response_set(object):
 
         # Read in all the responses
         for dat in data:
-            self.add(dat[0], dat[1], dat[2].lower(), dat[3].lower(), 
-                     dat[4].lower(), dat[5].lower(), float(dat[6]), 
+            self.add(dat[0], dat[1], dat[2].lower(), dat[3].lower(),
+                     dat[4].lower(), dat[5].lower(), float(dat[6]),
                      float(dat[7]), dir=indir)
 
     def add(self, name, spec, xtype, xunits, senstype, normtype, xnorm,
@@ -664,7 +667,7 @@ class response_set(object):
         if not bs in special_types:
             errmsg = "Unknown 'special' response type in {:s}"
             raise ValueError(errmsg.format(name))
-        
+
         # Look for units on first argument
         if len(spl) < 3:
             raise ValueError("Special type has no numerical spec")
@@ -702,14 +705,14 @@ class response_set(object):
 
         Each response goes into it's own group.
         """
-        
+
         for name in self._responses:
             d = handle.create_group(name)
             self._responses[name].writeToHDF5(d)
 
     def readFromHDF5(self, handle):
         """ Reads the response sets from a HDF5 file"""
-        
+
         # Clear old ones
         self._responses.clear()
 
@@ -726,7 +729,7 @@ class response_set(object):
         ----------
         name : string
           Name identifying response function.
-          
+
         Returns
         -------
         resp : response
@@ -742,7 +745,7 @@ class response_set(object):
     def __contains__(self, val):
         """ Is a particular response available?"""
         return val in self._responses
-    
+
     def items(self):
         """ Get all responses"""
         return self._responses.items()
