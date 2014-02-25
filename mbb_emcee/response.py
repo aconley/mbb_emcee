@@ -754,7 +754,7 @@ class response_set(object):
         """ Get all responses"""
         return self._responses.values()
 
-    def delitem(self, val):
+    def __delitem__(self, val):
         del self._responses[val]
 
     def __str__(self):
