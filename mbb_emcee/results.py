@@ -1118,14 +1118,14 @@ class mbb_results(object):
 
         ga = f["Ancillary"]
 
-        if "cosmo_type" in ga:
+        if "cosmo_type" in ga.attrs:
             self._cosmo_type = ga.attrs["cosmo_type"]
-        if "lumdist" in ga:
+        if "lumdist" in ga.attrs:
             self._has_lumdist = True
             self._lumdist = u.Quantity(ga.attrs["lumdist"], u.Mpc)
         else:
             self._has_lumdist = False
-        if "Lir" in ga:
+        if "Lir" in ga.attrs:
             self._lir_min = ga.attrs["LirMin"]
             self._lir_max = ga.attrs["LirMax"]
             self.lir = ga["Lir"][...]

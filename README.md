@@ -108,16 +108,23 @@ matplotlib via something like:
     import numpy as np
     res = mbb_emcee.mbb_results(h5file="test.h5")
     wave, flux, flux_unc = res.data
-    p_data = plt.errorbar(wave, flux, yerr=flux_unc, fmt='ro')
+    f = plt.figure()
+    ax1 = f.add_subplot(221)
+    p_data = ax1.errorbar(wave, flux, yerr=flux_unc, fmt='ro')
     p_wave = np.linspace(wave.min() * 0.5, wave.max() * 1.5, 200)
-    p_fit = plt.plot(p_wave, res.best_fit_sed(p_wave), color='blue')
-    plt.show()
-    h = plt.hist(res.parameter_chain('T/(1+z)'))
-    plt.show()
-    h = plt.hist(res.parameter_chain('beta'))
-    plt.show()
-    h = plt.hist(res.lir_chain)
-    plt.show()
+    p_fit = ax1.plot(p_wave, res.best_fit_sed(p_wave), color='blue')
+    ax1.set_xlabel('Wavelength [um]')
+    ax1.set_ylabel('Flux Density [mJy]')
+    ax2 = f.add_subplot(222)
+    h1 = ax2.hist(res.parameter_chain('T/(1+z)'))
+    ax2.set_xlabel('T / (1 + z)')
+    ax3 = f.add_subplot(223)
+    h2 = ax3.hist(res.parameter_chain('beta'))
+    ax3.set_xlabel(r'$\beta$')
+    ax4 = f.add_subplot(224)
+    h3 = ax4.hist(res.lir_chain)
+    ax4.set_xlabel(r'$L_{IR}$')
+    f.show()
 
 where the latter (plotting the chain of IR luminosities) requires that
 you have actually computed them as part of the fit.

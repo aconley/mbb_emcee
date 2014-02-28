@@ -344,6 +344,7 @@ class response(object):
         self._normparam = None
         self._normfac = 1.0
         self._sens_energy = True
+        self._data_read = True
 
     def _setup_box(self, cent, width):
         npoints = 11
@@ -672,10 +673,10 @@ class response_set(object):
         if len(spl) < 3:
             raise ValueError("Special type has no numerical spec")
         firstarg = spl[2].lower()
-        num = re.findall(r'\d+', firstarg)
+        num = re.findall(r'\d*\.\d+|\d+', firstarg)
         if len(num) == 0:
             raise ValueError("Special type needs numeric specification")
-        p = re.compile(r'^\d+')
+        p = re.compile(r'\d*\.\d+|\d+')
         firstarg_unit = p.sub("", firstarg)
         if len(firstarg_unit) == 0:
             xtype = 'freq'
