@@ -1,4 +1,4 @@
-from __future__ import print_function
+from __future__ import print_function, division
 
 import numpy as np
 import emcee
@@ -342,10 +342,14 @@ class mbb_results(object):
         if pcnt < 0 or pcnt > 100:
             raise ValueError("Invalid percentile {:f}".format(pcnt))
 
-        aint = copy.deepcopy(array)
+        pval = 0.5 * (100 - pcnt)
 
-        # Slice off ends if needed
-        if (not lowlim is None) or (not uplim is None):
+        if (lowlim is None) and (uplim is None):
+            mn = array.mean()
+            perc = np.percentile(array, [pval, 100-pval])
+        else:
+            aint = copy.deepcopy(array)
+            # Slice off ends if needed
             if lowlim is None:
                 cond = (aint <= float(uplim)).nonzero()[0]
             elif uplim is None:
@@ -359,15 +363,10 @@ class mbb_results(object):
             if len(cond) != len(aint):
                 aint = aint[cond]
 
-        aint.sort()
-        mnval = np.mean(aint)
-        pval = (1.0 - 0.01 * pcnt) / 2
-        na = len(aint)
-        lowidx = int(round(pval * na))
-        lowval = aint[lowidx]
-        upidx = int(round((1.0 - pval) * na))
-        upval = aint[upidx]
-        return np.array([mnval, upval-mnval, mnval-lowval])
+            mn = np.mean(aint)
+            perc = np.percentile(aint, [pval, 100-pval])
+
+        return np.array([mn, perc[1] - mn, mn - perc[0]])
 
     def parameter_chain(self, param):
         """ Gets flattened chain for parameter
@@ -460,9 +459,7 @@ class mbb_results(object):
         if percentile <= 0 or percentile >= 100.0:
             raise ValueError("percentile needs to be between 0 and 100")
 
-        svals = self.parameter_chain(paridx)
-        svals.sort()
-        return svals[round((1.0 - 0.01 * percentile) * len(svals))]
+        return np.percentile(self.parameter_chain(paridx), 100 - percentile)
 
     def par_uplim(self, param, percentile=68.3):
         """ Gets the upper limit for the parameter
@@ -493,9 +490,7 @@ class mbb_results(object):
         if percentile <= 0 or percentile >= 100.0:
             raise ValueError("percentile needs to be between 0 and 100")
 
-        svals = self.chain[:, :, paridx].flatten()
-        svals.sort()
-        return svals[round(0.01 * percentile * len(svals))]
+        return np.percentile(self.parameter_chain(paridx), percentile)
 
     @property
     def has_peaklambda(self):
