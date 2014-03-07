@@ -137,6 +137,8 @@ This depends on a number of python packages:
 * [cython](http://cython.org/)
 * [h5py](http://www.h5py.org/)
 * And, perhaps most importantly, [emcee](http://dan.iel.fm/emcee/)
+* [nose](https://nose.readthedocs.org/en/latest/) is needed if you
+  want to do the unit tests
 
 ### References
 * The affine invariant MCMC code is described in
