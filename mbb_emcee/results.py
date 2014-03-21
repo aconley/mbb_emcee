@@ -1120,7 +1120,8 @@ class mbb_results(object):
             self._lumdist = u.Quantity(ga.attrs["lumdist"], u.Mpc)
         else:
             self._has_lumdist = False
-        if "Lir" in ga.attrs:
+
+        if "Lir" in ga:
             self._lir_min = ga.attrs["LirMin"]
             self._lir_max = ga.attrs["LirMax"]
             self.lir = ga["Lir"][...]
