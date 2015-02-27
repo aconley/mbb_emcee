@@ -1,9 +1,8 @@
-from distutils.core import setup
-from distutils.extension import Extension
+from setuptools import setup, Extension
 from Cython.Distutils import build_ext
-
 import sys
 import numpy
+
 major, minor1, minor2, release, serial = sys.version_info
 
 if (major < 2) or (major == 2 and minor1 < 7):
