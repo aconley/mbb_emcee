@@ -188,6 +188,10 @@ class response(object):
                 # A real file -- read it!
                 if dir is None:
                     infile = inputspec
+                elif dir=='!package-dir!':
+                    # From package resources directory
+                    pfile = os.path.join('resources', inputspec)
+                    infile = resource_filename(__name__, pfile)
                 else:
                     infile = os.path.join(dir, inputspec)
 
@@ -676,7 +680,10 @@ class response_set(object):
         if inputfile is None:
             infile = resource_filename(__name__,
                                        'resources/mbb_filterwheel.txt')
-            indir = resource_filename(__name__, 'resources/')
+            # This doesn't work if the package is installed as an egg
+            # indir = resource_filename(__name__, 'resources/')
+            # So instead use a special code
+            indir = '!package-dir!'
         elif not isinstance(inputfile, basestring):
             raise TypeError("filename must be string-like")
         else:
