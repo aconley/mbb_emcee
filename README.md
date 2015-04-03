@@ -78,16 +78,28 @@ boxcar, cent is the central frequency in GHz (or wavelength, see
 below), and width is the width (also in GHz).  So, for example,
 PdBI_135_3.6. Delta function passbands are also allowed using
 inst_delta_cent, where, again, cent is the central frequency.
-Finally, ALMA type passbands are allowed using inst_alma_cent where, again,
-cent is the central frequency in GHz.  ALMA band 9 is not supported,
-and the assumption is that the standard IF ranges are used.  For ALMA band
-3, for example, this means 3.75 GHz coverage, a 8 GHz gap, then 3.75
-GHz coverage, with the center of the 8 GHz gap at the central
-frequency.  For band 6, on the other hand, the central gap is 12 GHz.
-More complex tunings require a special built filter file.  Note that
-this usually means the name of your band is something like ALMA_alma_230,
-since alma is both a telescope and a type of passband.  None of the values
-are case sesitive.
+
+In addition, a box with a central taken out is also supported.
+This is meant to represent a dual-sideband or sideband-separating
+receiver.  This is specified in terms of the central frequency,
+the total width, and the width of the gap (which is centered).
+So, for example, SMA_dsb_230_8_2 would be a 230 GHz centered band
+with a total width of 8 GHz but the central 2 GHz with no response.
+
+A specialization of this is also available for the ALMA recievers used
+in their widest frequency scan mode.  Here the specification is
+inst_alma_cent where, again, cent is the central frequency in GHz.
+ALMA bands 9 and 10 are not supported, and the assumption is that the
+standard IF ranges are used.  For ALMA band 3, for example, this means
+3.75 GHz coverage, a 8 GHz gap, then 3.75 GHz coverage, with the
+center of the 8 GHz gap at the central frequency.  For band 6, on the
+other hand, the central gap is 12 GHz.  More complex tunings require a
+special built filter file, or maybe the dsb construction used above.
+Note that this usually means the name of your band is something like
+ALMA_alma_230, since alma is both a telescope and a type of passband.
+Yes, this looks kind of stupid, but it's to give you the freedom to
+name your inst something else if you want. None of the values are case
+sensitive.
 
 It is also possible to specify the units as microns instead of GHz by
 appending um to the first numerical argument -- for example,

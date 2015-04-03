@@ -14,7 +14,7 @@ ext_modules = [Extension("fnu", ["mbb_emcee/fnu.pyx"],
 
 setup(
     name="mbb_emcee",
-    version="0.5.1",
+    version="0.5.2",
     provides="mbb_emcee",
     author="Alexander Conley",
     author_email="alexander.conley@colorado.edu",

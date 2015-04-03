@@ -17,7 +17,9 @@ except:
     #Python 3
     basestring = str
 
-special_types = ["delta", "box", "gauss", "alma"]
+special_types = ["delta", "box", "gauss", "dsb", "alma"]
+
+# TO DO: convert this to using astropy.units
 
 
 def response_bb(freq, temperature):
@@ -115,7 +117,20 @@ class response(object):
         Gaussian centered on val1 with a FWHM of val2.  It is sampled every
         FWHM/7 steps out to 3*FWHM in each direction.
 
-        So don't name your input files delta_?, gauss_?, or box_?
+        If inputspec is dsb_val1_val2_val3, then the filter function
+        is a box with a central chunk removed, where val1 is the
+        center, val2 the total width, and val3 the width of the central
+        removed part.
+
+        If inputspec is alma_val1, the filter function is an ALMA
+        2-sideband setup with the maximum frequency coverage.
+        This is like dsb, but with the default parameters set for
+        each ALMA band.  val1 is the central frequency, which automaticall
+        selects the band.  For example, alma_95 will make an ALMA band 3
+        setup.
+
+        So don't name your input files delta_?, gauss_?, dsb_?, alma_?,
+        or box_?
         """
 
         # Make sure all args have right case
@@ -155,6 +170,14 @@ class response(object):
                 xvals, self._resp = self._setup_gauss(float(spl[1]),
                                                       float(spl[2]))
 
+            elif bs == "dsb":
+                if len(spl) < 4:
+                    errstr = "dsb needs 3 params in {:s}".format(inputspec)
+                    raise ValueError(errstr)
+                xvals, self._resp = self._setup_dsb(float(spl[1]),
+                                                    float(spl[2]),
+                                                    float(spl[3]),
+                                                    xtyp, xun)
             elif bs == "alma":
                 if len(spl) < 2:
                     errstr = "alma needs 1 params in {:s}".format(inputspec)
@@ -365,6 +388,54 @@ class response(object):
         resp = numpy.exp(-0.5 * ((xvals - cent) / sig)**2)
         return xvals, resp
 
+    def _setup_dsb(self, cent, width, gap, xtype='freq', xunit='gHz'):
+        """ Dual side band setup.  Bascially a box with a central chunk removed
+
+        cent is the central frequency
+        width is the total width
+        gap is the width of the central gap
+        """
+        
+        # Convert params to GHz, getting 4 frequencies start/stop/start/stop
+        npoints = 13
+        npoints0 = 3
+        nodes = numpy.array([cent - width/2, cent - gap/2, cent + gap/2,
+                             cent + width/2])
+        if xtype == 'wave':
+            if xunit == 'angstroms':
+                freqs = 2997924580.0 / nodes
+            elif xunit == 'microns':
+                freqs = 299792458e-3 / nodes
+            elif xunit == 'meters':
+                freqs = 299792458.0e-9 / nodes
+            else:
+                errmsg = "Unrecognized wavelength unit {:s}".format(xunit)
+                raise ValueError(errmsg)
+        elif xtype == 'freq':
+            if xunit == 'hz':
+                freqs = nodes * 1e-9
+            elif xunit == 'mhz':
+                freqs = nodes * 1e-3
+            elif xunit == 'ghz':
+                freqs = nodes
+            elif xunit == 'thz':
+                freqs = nodes * 1e3
+            else:
+                errmsg = "Unrecognized frequency unit {:s}".format(xunit)
+                raise ValueError(errmsg)
+        else:
+            raise ValueError("Unknown unit type {:s}".format(xtype))
+        freqs.sort()
+        
+        xvals0 = numpy.linspace(freqs[0], freqs[1], npoints)
+        xvals1 = numpy.linspace(freqs[1] + 0.0001, freqs[2] - 0.0001, npoints0)
+        xvals2 = numpy.linspace(freqs[2], freqs[3], npoints)
+        xvals = numpy.concatenate((xvals0, xvals1, xvals2))
+        resp = numpy.concatenate((numpy.ones(npoints), numpy.zeros(npoints0),
+                                  numpy.ones(npoints)))
+        return xvals, resp
+
+    
     def _setup_alma(self, cent, xtype='freq', xunit='gHz'):
         # Get central frequency in GHz
         npoints = 13
@@ -651,7 +722,7 @@ class response_set(object):
         assumed to be energy and the normalization flat.
 
         The format is name_type_values, where type is the special type
-        (box, gauss, etc.), and values are the things needed to specify
+        (box, gauss, dsb, etc.), and values are the things needed to specify
         the type.  On the first value it is possible to specify units
         (GHz or um) on the first argument -- so ZSpec_box_1050um_100
         will make a boxcar in wavelength space, but SMA_box_234_16Ghz_8

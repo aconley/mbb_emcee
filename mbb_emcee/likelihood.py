@@ -2,7 +2,7 @@ import numpy as np
 import math
 import copy
 from .modified_blackbody import modified_blackbody
-from .response import response, response_set
+from .response import response, response_set, special_types
 
 __all__ = ["likelihood"]
 
@@ -191,7 +191,8 @@ class likelihood(object):
                     if name.find('_'):
                         # May be -- split off first part
                         bs = name.split('_')[1].lower()
-                        if bs in ["delta", "box", "alma", "gauss"]:
+                        
+                        if bs in special_types:
                             # Add it!
                             self._responsewheel.add_special(name)
                         else:
